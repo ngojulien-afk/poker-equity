@@ -1,0 +1,2059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PokerEquity — Equity Calculator</title>
+<style>
+:root {
+  --bg:       #09131c;
+  --panel:    #111e2b;
+  --card-bg:  #162333;
+  --border:   #243649;
+  --green:    #27ae60;
+  --green-lt: #2ecc71;
+  --red:      #e74c3c;
+  --blue:     #2980b9;
+  --gold:     #d4a017;
+  --text:     #d8eaf8;
+  --muted:    #6a8fa8;
+  --radius:   8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+
+/* ── HEADER ── */
+header{background:linear-gradient(135deg,#0c1c2c,#152840);border-bottom:2px solid var(--green);padding:14px 20px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{font-size:26px}
+.logo h1{font-size:20px;font-weight:800;color:var(--green-lt);letter-spacing:1px}
+.logo small{font-size:11px;color:var(--muted);display:block}
+nav{display:flex;gap:6px}
+.tab-btn{padding:7px 18px;border:2px solid var(--border);background:transparent;color:var(--muted);border-radius:20px;cursor:pointer;font-size:13px;font-weight:700;transition:.2s}
+.tab-btn:hover{border-color:var(--green);color:var(--text)}
+.tab-btn.active{background:var(--green);border-color:var(--green);color:#fff}
+
+/* ── LAYOUT ── */
+main{max-width:1120px;margin:0 auto;padding:20px 14px}
+.tab-content{display:none}.tab-content.active{display:block}
+.section{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px}
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);font-weight:700;margin-bottom:14px}
+
+/* ── PLAYER ROWS ── */
+.players-grid{display:flex;flex-direction:column;gap:10px}
+.player-row{display:grid;grid-template-columns:90px 1fr 90px auto auto;gap:10px;align-items:start;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px}
+.player-label{font-weight:800;font-size:13px;padding-top:10px}
+.player-label small{display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:2px}
+
+/* range input + matrix button */
+.range-field{display:flex;gap:6px;align-items:flex-start}
+.range-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:9px 11px;font-family:'SF Mono','Fira Code',monospace;transition:.2s;min-width:0}
+.range-input:focus{outline:none;border-color:var(--green)}
+.range-input.error{border-color:var(--red)}
+.matrix-btn{flex-shrink:0;width:38px;height:38px;background:var(--panel);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--muted);font-size:18px;display:flex;align-items:center;justify-content:center;transition:.2s;padding:0}
+.matrix-btn:hover{border-color:var(--green);color:var(--green-lt)}
+.combo-badge{font-size:11px;color:var(--muted);margin-top:5px;min-height:15px}
+.combo-badge.valid{color:var(--green)}.combo-badge.error{color:var(--red)}
+
+/* BB stack dropdown */
+.bb-wrap{display:flex;flex-direction:column;gap:4px}
+.bb-select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px 6px;text-align:center;cursor:pointer;transition:.2s;appearance:none;-webkit-appearance:none;text-align-last:center}
+.bb-select:focus{outline:none;border-color:var(--blue)}
+.bb-label{font-size:10px;text-align:center;color:var(--muted);letter-spacing:.8px;text-transform:uppercase}
+
+.player-color-bar{width:4px;border-radius:2px;align-self:stretch;min-height:38px}
+.remove-btn{width:28px;height:28px;border-radius:50%;background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:.2s;margin-top:5px;flex-shrink:0}
+.remove-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ── BOARD SLOTS ── */
+.board-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.board-slot{width:58px;height:80px;border:2px dashed var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:.2s;background:var(--card-bg);flex-shrink:0}
+.board-slot:hover{border-color:var(--green)}
+.board-slot .slot-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.board-slot.filled{border-style:solid;background:#fff}
+.board-slot.filled:hover{border-color:var(--red)}
+.board-slot .card-r{font-size:19px;font-weight:900;line-height:1}
+.board-slot .card-s{font-size:21px;line-height:1;margin-top:1px}
+.board-slot.rc .card-r,.board-slot.rc .card-s{color:#c0392b}
+.board-slot.bc .card-r,.board-slot.bc .card-s{color:#1a1a2e}
+.board-sep{width:1px;height:60px;background:var(--border);border-radius:1px}
+
+/* ── BUTTONS ── */
+.btn{padding:10px 24px;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:8px}
+.btn-primary{background:var(--green);color:#fff}.btn-primary:hover{background:var(--green-lt);transform:translateY(-1px)}
+.btn-primary:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--panel);border:1px solid var(--border);color:var(--text)}.btn-secondary:hover{border-color:var(--green);color:var(--green-lt)}
+.btn-sm{padding:6px 14px;font-size:12px;border-radius:5px}
+.actions-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spinner{display:none;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
+.spinner.on{display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── RESULTS ── */
+.results-section{display:none}.results-section.visible{display:block}
+.result-row{display:grid;grid-template-columns:minmax(120px,160px) 1fr 80px 80px 80px;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.result-row:last-child{border-bottom:none}
+.result-range{font-family:monospace;font-size:12px;font-weight:700;word-break:break-all}
+.result-bar-wrap{position:relative;height:28px}
+.result-bar-bg{position:absolute;inset:0;background:var(--bg);border-radius:4px;overflow:hidden}
+.result-bar-fill{height:100%;border-radius:4px;transition:width .8s ease}
+.result-bar-lbl{position:absolute;inset:0;display:flex;align-items:center;padding-left:10px;font-weight:800;font-size:15px;z-index:1}
+.result-stat .val{font-size:17px;font-weight:800;text-align:center}
+.result-stat .lbl{font-size:10px;color:var(--muted);text-align:center;margin-top:2px}
+
+/* ── ERROR / ALERT ── */
+.err-msg{display:none;background:rgba(231,76,60,.13);border:1px solid var(--red);border-radius:6px;padding:10px 14px;color:#ff9999;font-size:13px;margin-top:10px}
+.err-msg.on{display:block}
+.hint{font-size:11px;color:var(--muted);line-height:1.7;margin-top:10px}
+.hint code{background:var(--bg);padding:1px 5px;border-radius:3px;font-family:monospace;color:var(--green-lt)}
+
+/* ── CARD PICKER MODAL ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:900;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.modal-title{font-size:17px;font-weight:800}
+.modal-x{background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1}
+.modal-x:hover{color:var(--red)}
+
+/* Card picker grid */
+#card-picker-modal .modal{max-width:640px;width:95vw}
+.cpick-grid{display:flex;flex-direction:column;gap:3px}
+.cpick-row{display:grid;grid-template-columns:28px repeat(13,1fr);gap:3px}
+.cpick-suit-lbl{display:flex;align-items:center;justify-content:center;font-size:18px}
+.cpick-rank-row{display:grid;grid-template-columns:28px repeat(13,1fr);gap:3px;margin-bottom:6px}
+.cpick-rank-lbl{text-align:center;font-size:10px;color:var(--muted);font-weight:700}
+.pick-card{background:#fff;border:2px solid #ccc;border-radius:5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;font-size:12px;aspect-ratio:.7;transition:.12s;line-height:1.1;padding:1px}
+.pick-card:hover:not(.used){transform:scale(1.12);border-color:var(--green);z-index:2;position:relative}
+.pick-card.red{color:#cc0000}.pick-card.black{color:#111}
+.pick-card.used{opacity:.2;cursor:not-allowed;background:#999}
+.pick-card .ps{font-size:15px}
+
+/* ── RANGE MATRIX MODAL ── */
+#rm-modal .overlay-inner{display:flex;align-items:center;justify-content:center;min-height:100%}
+#rm-modal .modal{max-width:600px;width:96vw;padding:14px;max-height:92vh;overflow-y:auto;display:flex;flex-direction:column}
+.rm-stats{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.rm-combos-badge{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700}
+.rm-pct-badge{color:var(--muted);font-size:12px}
+.rm-preset-btns{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.rm-preset-btn{padding:3px 9px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:4px;cursor:pointer;font-size:10px;font-weight:600;transition:.15s}
+.rm-preset-btn:hover{border-color:var(--green);color:var(--green-lt)}
+
+/* Matrix grid */
+.rm-grid-outer{overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1}
+.rm-grid-wrap{display:grid;grid-template-columns:14px repeat(13,1fr);grid-template-rows:14px repeat(13,1fr);gap:2px;min-width:360px;user-select:none}
+.rm-hdr{display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--muted);font-weight:800}
+.mcell{border-radius:3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;aspect-ratio:.88;transition:filter .1s;position:relative;min-width:0}
+.mcell .mh{font-size:8px;font-weight:800;line-height:1;pointer-events:none}
+.mcell .mc{font-size:7px;opacity:.7;pointer-events:none}
+/* unselected base colors */
+.mcell.pair   {background:#231f0e;color:#a08030}
+.mcell.suited {background:#0d2016;color:#3d8a5e}
+.mcell.offsuit{background:#0d1a26;color:#2a5f8a}
+/* selected */
+.mcell.pair.sel   {background:#b8860b;color:#fff}
+.mcell.suited.sel {background:#218f50;color:#fff}
+.mcell.offsuit.sel{background:#1d6fa3;color:#fff}
+/* drag preview */
+.mcell.preview{filter:brightness(1.55)}
+.mcell:hover:not(.preview){filter:brightness(1.3)}
+
+/* Matrix legend */
+.rm-legend{display:flex;gap:16px;margin:10px 0 12px;flex-wrap:wrap}
+.rm-leg-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.rm-leg-sw{width:14px;height:14px;border-radius:3px}
+
+/* Range text input at bottom of modal */
+.rm-footer{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.rm-text-input{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:8px 10px;font-family:monospace;width:100%}
+.rm-text-input:focus{outline:none;border-color:var(--green)}
+.rm-footer-btns{display:flex;gap:8px;flex-shrink:0}
+
+/* ── RANGE LIBRARY ── */
+/* Two-column layout: grid on left, controls on right */
+#tab-library.active{display:flex!important;flex-direction:row}
+#tab-library{height:calc(100vh - 90px);overflow:hidden;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0}
+.rl-left-col{flex:1;min-width:0;display:flex;flex-direction:column;padding:14px;gap:8px;overflow:hidden;border-right:1px solid var(--border)}
+.rl-right-col{width:215px;flex-shrink:0;display:flex;flex-direction:column;padding:14px;gap:0;overflow-y:auto}
+.rl-right-sep{border-top:1px solid var(--border);margin:12px 0}
+.rl-toolbar{display:flex;align-items:flex-end;gap:14px;flex-shrink:0;padding-bottom:20px;flex-wrap:wrap}
+.rl-toolbar-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.rl-vsep{width:1px;height:40px;background:var(--border)}
+
+/* Colored matrix grid */
+.rl-grid-outer{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:0}
+.rl-grid-sizer{height:100%;aspect-ratio:1;max-width:100%;max-height:100%}
+.rl-grid-wrap{display:grid;grid-template-columns:14px repeat(13,1fr);grid-template-rows:14px repeat(13,1fr);gap:2px;width:100%;height:100%;user-select:none}
+.rl-hdr{display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--muted);font-weight:800}
+.rlcell{border-radius:3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-width:0;overflow:hidden;transition:filter .1s}
+.rlcell .rh{font-size:10px;font-weight:800;line-height:1;pointer-events:none;position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.rlcell.empty{background:#182535;color:#3a5572}
+.rlcell:not(.empty){color:#fff}
+.rlcell:hover{filter:brightness(1.25)}
+
+/* Palette */
+.rl-palette{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.rl-cbtn{width:30px;height:30px;border-radius:6px;border:3px solid transparent;cursor:pointer;transition:.15s;position:relative;flex-shrink:0}
+.rl-cbtn.active{border-color:#fff!important;transform:scale(1.12)}
+.rl-cbtn:hover:not(.active){transform:scale(1.07)}
+.rl-cbtn .rl-label{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:8px;white-space:nowrap;color:var(--muted);pointer-events:none}
+.rl-eraser{width:30px;height:30px;border-radius:6px;border:2px solid var(--border);background:var(--card-bg);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:.15s;color:var(--muted);flex-shrink:0}
+.rl-eraser.active{border-color:#fff;color:#fff}
+.rl-mode-btn{padding:5px 11px;border:2px solid var(--border);background:transparent;color:var(--muted);border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;transition:.2s;flex-shrink:0}
+.rl-mode-btn.active{background:#d4a017;border-color:#d4a017;color:#000}
+
+/* Legend */
+.rl-legend{display:flex;gap:10px;flex-wrap:wrap;flex-shrink:0;align-items:center}
+.rl-leg-it{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.rl-leg-sw{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+
+/* Sidebar position buttons */
+.rl-cat-col{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.rl-cat-btn{padding:6px 12px;border:2px solid var(--border);background:transparent;color:var(--muted);border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;transition:.2s;text-align:left}
+.rl-cat-btn:hover{border-color:var(--green);color:var(--text)}
+.rl-cat-btn.active{background:var(--green);border-color:var(--green);color:#fff}
+.rl-pos-row{display:flex;gap:5px;flex-wrap:wrap}
+.rl-pos-btn{padding:4px 10px;border:1px solid var(--border);background:var(--card-bg);color:var(--muted);border-radius:5px;cursor:pointer;font-size:11px;font-weight:800;transition:.2s}
+.rl-pos-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.rl-pos-btn:hover:not(.active){border-color:var(--blue);color:var(--text)}
+.rl-sel-stack{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;cursor:pointer;transition:.2s;width:100%}
+.rl-sel-stack:focus{outline:none;border-color:var(--blue)}
+.rl-range-label{font-size:12px;color:var(--green-lt);font-weight:800;padding:5px 10px;background:rgba(39,174,96,.12);border:1px solid rgba(39,174,96,.3);border-radius:6px;display:block;text-align:center;margin-top:8px;word-break:break-word}
+
+/* Saved list */
+.rl-saved-list{display:flex;flex-direction:column;gap:5px;min-height:24px;overflow-y:auto}
+.rl-stag{padding:5px 9px;background:var(--card-bg);border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--muted);cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:5px;word-break:break-all}
+.rl-stag:hover{border-color:var(--green);color:var(--text)}
+.rl-stag .del{color:var(--red);line-height:1;font-size:13px;opacity:.6;margin-left:auto;flex-shrink:0}
+.rl-stag .del:hover{opacity:1}
+
+/* ── TRAINING ── */
+#tab-training{padding:24px 14px}
+.tr-type-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.tr-type-btn{padding:7px 18px;border:2px solid var(--border);background:transparent;color:var(--muted);border-radius:20px;cursor:pointer;font-size:13px;font-weight:700;transition:.2s}
+.tr-type-btn:hover{border-color:var(--green);color:var(--text)}
+.tr-type-btn.active{background:var(--green);border-color:var(--green);color:#fff}
+.tr-panel{display:none}.tr-panel.active{display:block}
+/* NOF – Nature of Flop */
+.nof-wrap{max-width:620px;margin:0 auto}
+.nof-card{width:62px;height:86px;background:#fff;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 5px 16px rgba(0,0,0,.55);border:2px solid #ddd;flex-shrink:0;transition:transform .15s}
+.nof-card-rank{font-size:24px;font-weight:900;line-height:1}
+.nof-card-suit{font-size:28px;line-height:1;margin-top:1px}
+.nof-card.rc .nof-card-rank,.nof-card.rc .nof-card-suit{color:#c0392b}
+.nof-card.bc .nof-card-rank,.nof-card.bc .nof-card-suit{color:#1a1a2e}
+.nof-card.placeholder{background:rgba(0,0,0,.18);border:2px dashed rgba(255,255,255,.18);box-shadow:none}
+
+/* Poker table */
+.nof-table-wrap{position:relative;width:100%;max-width:520px;margin:18px auto 14px;aspect-ratio:1.65}
+.nof-table{position:absolute;inset:18px;background:radial-gradient(ellipse at center,#1e7a44 0%,#0f4b27 60%,#062c16 100%);border-radius:50%;border:10px solid #4a2818;box-shadow:inset 0 0 38px rgba(0,0,0,.55),0 10px 28px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center}
+.nof-flop{display:flex;gap:10px;justify-content:center;align-items:center}
+.nof-seat{position:absolute;min-width:48px;padding:5px 11px;background:var(--card-bg);border:2px solid var(--border);border-radius:18px;font-size:11px;font-weight:800;color:var(--text);text-align:center;box-shadow:0 3px 10px rgba(0,0,0,.5);z-index:2;letter-spacing:.5px}
+.nof-seat.hero{border-color:var(--green);color:var(--green-lt);background:rgba(39,174,96,.18)}
+.nof-choices{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:24px}
+.nof-btn{padding:14px 26px;border:2px solid var(--border);background:var(--panel);color:var(--text);border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:.2s;min-width:130px;text-align:center}
+.nof-btn:hover:not(:disabled){border-color:var(--blue);color:var(--text);transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.nof-btn.selected{border-color:var(--blue);background:var(--blue);color:#fff}
+.nof-btn.correct{border-color:var(--green);background:var(--green);color:#fff}
+.nof-btn.wrong{border-color:var(--red);background:rgba(231,76,60,.15);color:var(--red)}
+.nof-btn:disabled{cursor:default;transform:none;box-shadow:none}
+.nof-result{text-align:center;margin-top:22px;min-height:36px;font-size:15px;font-weight:700}
+.nof-result.correct{color:var(--green-lt)}
+.nof-result.wrong{color:#ff7070}
+.nof-score{display:flex;justify-content:center;gap:24px;margin-bottom:20px}
+.nof-score-item{text-align:center}
+.nof-score-item .sv{font-size:24px;font-weight:800}
+.nof-score-item .sl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.nof-score-item.correct .sv{color:var(--green-lt)}
+.nof-score-item.wrong  .sv{color:#ff7070}
+
+/* ── SCENARIO ANALYZER ── */
+.sc-card-grid{display:grid;grid-template-columns:repeat(13,1fr);gap:2.5px;margin-top:10px;user-select:none}
+.sc-rank-hdr{text-align:center;font-size:10px;font-weight:800;color:var(--muted);padding:3px 0}
+.acell{border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;aspect-ratio:.68;transition:.15s;border:2px solid transparent;cursor:pointer;min-width:0}
+.acell:hover:not(.dead){transform:scale(1.13);border-color:rgba(255,255,255,.6);z-index:2;position:relative}
+.acell.dead{opacity:.15;cursor:default;background:#222}
+.acell.dead:hover{transform:none;border-color:transparent}
+.acell.sel-turn{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,.35)}
+.acell .ar{font-size:10px;font-weight:800;line-height:1;pointer-events:none}
+.acell .as{font-size:12px;line-height:1;pointer-events:none}
+.acell .ae{font-size:8.5px;margin-top:2px;pointer-events:none}
+
+.eq-legend{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--muted)}
+.eq-legend-bar{height:11px;width:160px;border-radius:3px;background:linear-gradient(to right,#e74c3c,#f39c12,#27ae60)}
+
+.turn-info-bar{display:none;align-items:center;gap:14px;background:var(--card-bg);border:1px solid var(--green);border-radius:8px;padding:10px 16px;margin:10px 0}
+.turn-info-bar.on{display:flex}
+.mini-card{width:46px;height:62px;border-radius:6px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;cursor:default}
+.mini-card .mr{font-size:17px;font-weight:900;line-height:1}
+.mini-card .ms{font-size:18px;line-height:1;margin-top:1px}
+.mini-card.rc .mr,.mini-card.rc .ms{color:#c0392b}
+.mini-card.bc .mr,.mini-card.bc .ms{color:#1a1a2e}
+.alert-info{background:rgba(41,128,185,.1);border:1px solid #2980b9;border-radius:6px;padding:9px 13px;font-size:12px;color:#aad4f0;margin-bottom:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">♠</span>
+    <div><h1>PokerEquity</h1><small>Professional equity calculator</small></div>
+  </div>
+  <nav>
+    <button class="tab-btn active" data-tab="calculator">Equity Calculator</button>
+    <button class="tab-btn" data-tab="scenario">Scenario Analyzer</button>
+    <button class="tab-btn" data-tab="library">My Ranges</button>
+    <button class="tab-btn" data-tab="training">Training</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ════════════ TAB 1 : EQUITY CALCULATOR ════════════ -->
+<div class="tab-content active" id="tab-calculator">
+
+  <div class="section">
+    <div class="section-title">Players — Ranges &amp; Stacks</div>
+    <div class="players-grid" id="players-container"></div>
+    <div style="margin-top:10px">
+      <button class="btn btn-secondary btn-sm" onclick="addPlayer()" id="add-player-btn">+ Add player</button>
+    </div>
+    <div class="hint">
+      <strong>Quick notation:</strong>
+      <code>AA</code> pairs · <code>AKs</code> suited · <code>AKo</code> offsuit · <code>AK</code> both ·
+      <code>JJ+</code> JJ and better · <code>ATs+</code> AT–AK suited · <code>77-JJ</code> range ·
+      <code>AhKs</code> specific hand — or click <strong>⊞</strong> for the visual grid
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Board (optional)</div>
+    <div class="board-row" id="board-slots"></div>
+  </div>
+
+  <div class="section">
+    <div class="actions-row">
+      <button class="btn btn-primary" onclick="calculateEquity()" id="calc-btn">
+        Calculate <div class="spinner" id="calc-spin"></div>
+      </button>
+      <button class="btn btn-secondary" onclick="clearCalc()">Reset</button>
+      <span id="calc-status" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="err-msg" id="calc-err"></div>
+  </div>
+
+  <div class="section results-section" id="results-section">
+    <div class="section-title">Results</div>
+    <div id="results-container"></div>
+  </div>
+
+</div>
+
+<!-- ════════════ TAB 2 : SCENARIO ANALYZER ════════════ -->
+<div class="tab-content" id="tab-scenario">
+
+  <div class="section">
+    <div class="section-title">Players</div>
+    <div class="players-grid">
+      <div class="player-row">
+        <div class="player-label" style="color:#27ae60">Player 1<small>Your hand/range</small></div>
+        <div>
+          <div class="range-field">
+            <input class="range-input" id="sc-r1" type="text" placeholder="e.g. AhKs or AA,KK,AKs"
+              oninput="scValidate(1)">
+            <button class="matrix-btn" title="Visual range selector"
+              onclick="openRangeMatrix('sc1')">⊞</button>
+          </div>
+          <div class="combo-badge" id="sc-cb1"></div>
+        </div>
+        <div class="bb-wrap">
+          <select class="bb-select" id="sc-bb1"></select>
+          <div class="bb-label">Stack BB</div>
+        </div>
+        <div class="player-color-bar" style="background:#27ae60"></div>
+        <div></div>
+      </div>
+      <div class="player-row">
+        <div class="player-label" style="color:#3498db">Player 2<small>Opponent range</small></div>
+        <div>
+          <div class="range-field">
+            <input class="range-input" id="sc-r2" type="text" placeholder="e.g. QQ+,AKs"
+              oninput="scValidate(2)">
+            <button class="matrix-btn" title="Visual range selector"
+              onclick="openRangeMatrix('sc2')">⊞</button>
+          </div>
+          <div class="combo-badge" id="sc-cb2"></div>
+        </div>
+        <div class="bb-wrap">
+          <select class="bb-select" id="sc-bb2"></select>
+          <div class="bb-label">Stack BB</div>
+        </div>
+        <div class="player-color-bar" style="background:#3498db"></div>
+        <div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Flop</div>
+    <div class="board-row" id="sc-flop-slots"></div>
+  </div>
+
+  <div class="section">
+    <div class="actions-row">
+      <button class="btn btn-primary" onclick="analyzeTurn()" id="sc-btn">
+        Analyze Turn <div class="spinner" id="sc-spin"></div>
+      </button>
+      <button class="btn btn-secondary" onclick="clearScenario()">Reset</button>
+    </div>
+    <div class="err-msg" id="sc-err"></div>
+  </div>
+
+  <div class="section" id="sc-turn-sec" style="display:none">
+    <div class="section-title">Player 1 Equity by Turn Card</div>
+    <div class="alert-info">Click a card to analyze the river.</div>
+    <div class="eq-legend"><span>0%</span><div class="eq-legend-bar"></div><span>100%</span></div>
+    <div class="sc-card-grid" id="sc-turn-grid"></div>
+  </div>
+
+  <div class="turn-info-bar" id="turn-info">
+    <span style="font-size:12px;color:var(--muted)">Selected turn:</span>
+    <div class="mini-card" id="turn-mini"></div>
+    <button class="btn btn-primary btn-sm" onclick="analyzeRiver()" id="river-btn">
+      Analyze River <div class="spinner" id="rv-spin"></div>
+    </button>
+  </div>
+
+  <div class="section" id="sc-river-sec" style="display:none">
+    <div class="section-title">Player 1 Equity by River Card</div>
+    <div class="eq-legend"><span>0%</span><div class="eq-legend-bar"></div><span>100%</span></div>
+    <div class="sc-card-grid" id="sc-river-grid"></div>
+  </div>
+
+</div><!-- /tab-scenario -->
+
+<!-- ════════════ TAB 3 : MES RANGES ════════════ -->
+<div class="tab-content" id="tab-library">
+
+  <!-- LEFT: grid + palette -->
+  <div class="rl-left-col">
+    <div class="section-title" style="flex-shrink:0;margin-bottom:0">Range Builder</div>
+
+    <!-- Toolbar: palette + mode -->
+    <div class="rl-toolbar">
+      <div>
+        <div class="rl-toolbar-label">Color</div>
+        <div class="rl-palette" id="rl-palette"></div>
+      </div>
+      <div class="rl-vsep"></div>
+      <div>
+        <div class="rl-toolbar-label">Paint mode</div>
+        <div style="display:flex;gap:6px">
+          <button class="rl-mode-btn active" id="rl-full-btn" onclick="rlSetHalf(false)" title="Paint the whole cell">■ Full</button>
+          <button class="rl-mode-btn" id="rl-half-btn" onclick="rlSetHalf(true)" title="Paint the right half (mixed strategy)">⬔ ½ Mixed</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 13×13 square grid -->
+    <div class="rl-grid-outer">
+      <div class="rl-grid-sizer">
+        <div class="rl-grid-wrap" id="rl-grid"></div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="rl-legend" id="rl-legend"></div>
+  </div>
+
+  <!-- RIGHT: situation + save -->
+  <div class="rl-right-col">
+    <div class="section-title" style="margin-bottom:8px">Game Situation</div>
+
+    <div class="rl-toolbar-label" style="margin-bottom:5px">Category</div>
+    <div class="rl-cat-col" id="rl-cats">
+      <button class="rl-cat-btn active" onclick="rlSetCat('RFI')">Open</button>
+      <button class="rl-cat-btn" onclick="rlSetCat('vs_Open')">vs Open</button>
+      <button class="rl-cat-btn" onclick="rlSetCat('vs_3bet')">vs 3bet</button>
+      <button class="rl-cat-btn" onclick="rlSetCat('BvB')">BvB</button>
+    </div>
+
+    <div id="rl-pos-section" style="margin-top:10px"></div>
+
+    <div style="margin-top:10px">
+      <div class="rl-toolbar-label" style="margin-bottom:5px">Effective stack</div>
+      <select class="rl-sel-stack" id="rl-stack" onchange="rlSetStack(this.value)"></select>
+    </div>
+    <span class="rl-range-label" id="rl-range-label">BTN Open — 100BB</span>
+
+    <div class="rl-right-sep"></div>
+    <div class="section-title" style="margin-bottom:8px">Save</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+      <button class="btn btn-primary btn-sm" onclick="rlSave(this)" style="justify-content:center">Save range</button>
+      <button class="btn btn-secondary btn-sm" onclick="rlShowCopyPanel()" id="rl-copy-btn" style="justify-content:center">Copy to…</button>
+      <button class="btn btn-secondary btn-sm" onclick="rlClear()" style="justify-content:center">Clear all</button>
+      <button class="btn btn-secondary btn-sm" onclick="rlUseInCalc()" style="justify-content:center">→ Calculator</button>
+    </div>
+
+    <!-- Copy panel -->
+    <div id="rl-copy-panel" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px">
+      <div class="rl-toolbar-label" style="margin-bottom:6px">Copy to…</div>
+      <div class="rl-toolbar-label" style="margin-bottom:3px">Category</div>
+      <select id="cp-cat" class="rl-sel-stack" style="margin-bottom:7px" onchange="cpUpdateHero()">
+        <option value="RFI">Open</option>
+        <option value="vs_Open">vs Open</option>
+        <option value="vs_3bet">vs 3bet</option>
+        <option value="BvB">BvB</option>
+      </select>
+      <div class="rl-toolbar-label" style="margin-bottom:3px">Position</div>
+      <select id="cp-hero" class="rl-sel-stack" style="margin-bottom:7px" onchange="cpUpdateVill()"></select>
+      <div id="cp-vill-wrap">
+        <div class="rl-toolbar-label" style="margin-bottom:3px">Opponent</div>
+        <select id="cp-vill" class="rl-sel-stack" style="margin-bottom:7px"></select>
+      </div>
+      <div class="rl-toolbar-label" style="margin-bottom:3px">Stack</div>
+      <select id="cp-stack" class="rl-sel-stack" style="margin-bottom:10px"></select>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-primary btn-sm" onclick="rlDoCopy()" style="flex:1;justify-content:center">Copy</button>
+        <button class="btn btn-secondary btn-sm" onclick="rlHideCopyPanel()" style="flex:1;justify-content:center">Cancel</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Saved ranges:</div>
+    <div class="rl-saved-list" id="rl-saved-list">
+      <span style="font-size:12px;color:var(--muted)">No saved ranges</span>
+    </div>
+  </div>
+
+</div><!-- /tab-library -->
+
+<!-- ════════════ TAB 4 : TRAINING ════════════ -->
+<div class="tab-content" id="tab-training">
+
+  <!-- Training type selector -->
+  <div class="tr-type-bar">
+    <button class="tr-type-btn active" onclick="selectTraining('nof')">Nature of Flop</button>
+  </div>
+
+  <!-- ── Nature of Flop ── -->
+  <div class="tr-panel active section" id="tr-nof">
+    <div class="nof-wrap">
+
+      <!-- Score -->
+      <div class="nof-score">
+        <div class="nof-score-item correct">
+          <div class="sv" id="nof-correct">0</div>
+          <div class="sl">Correct</div>
+        </div>
+        <div class="nof-score-item" style="align-self:center;color:var(--muted);font-size:18px">·</div>
+        <div class="nof-score-item wrong">
+          <div class="sv" id="nof-wrong">0</div>
+          <div class="sl">Wrong</div>
+        </div>
+        <div class="nof-score-item" style="align-self:center;color:var(--muted);font-size:18px">·</div>
+        <div class="nof-score-item">
+          <div class="sv" id="nof-total">0</div>
+          <div class="sl">Total</div>
+        </div>
+      </div>
+
+      <!-- Poker table with flop in the middle -->
+      <div class="nof-table-wrap">
+        <div class="nof-table">
+          <div class="nof-flop" id="nof-flop">
+            <div class="nof-card placeholder"></div>
+            <div class="nof-card placeholder"></div>
+            <div class="nof-card placeholder"></div>
+          </div>
+        </div>
+        <!-- 6-max seats around the table -->
+        <div class="nof-seat" style="left:50%;top:0;transform:translate(-50%,-50%)">LJ</div>
+        <div class="nof-seat" style="right:4%;top:18%;transform:translateY(-50%)">HJ</div>
+        <div class="nof-seat" style="right:4%;bottom:18%;transform:translateY(50%)">CO</div>
+        <div class="nof-seat hero" style="left:50%;bottom:0;transform:translate(-50%,50%)">BTN</div>
+        <div class="nof-seat" style="left:4%;bottom:18%;transform:translateY(50%)">SB</div>
+        <div class="nof-seat" style="left:4%;top:18%;transform:translateY(-50%)">BB</div>
+      </div>
+
+      <!-- New flop button -->
+      <div style="text-align:center;margin-top:6px">
+        <button class="btn btn-secondary" onclick="nofNewFlop()">🎲 New Flop</button>
+      </div>
+
+      <!-- Question -->
+      <div style="text-align:center;margin-top:28px;margin-bottom:4px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">
+        What type of flop is this?
+      </div>
+
+      <!-- Answer buttons -->
+      <div class="nof-choices">
+        <button class="nof-btn" data-answer="dry"   onclick="nofAnswer('dry')">🏜 Très Dry</button>
+        <button class="nof-btn" data-answer="mid"   onclick="nofAnswer('mid')">⚖️ Intermédiaire</button>
+        <button class="nof-btn" data-answer="drawy" onclick="nofAnswer('drawy')">🌊 Drawy</button>
+      </div>
+
+      <!-- Result -->
+      <div class="nof-result" id="nof-result"></div>
+
+    </div>
+  </div>
+
+</div><!-- /tab-training -->
+
+</main>
+
+<!-- ══════════════════════════════════════════
+     CARD PICKER MODAL
+══════════════════════════════════════════ -->
+<div class="overlay" id="card-picker-modal">
+  <div class="modal" style="max-width:640px;width:95vw">
+    <div class="modal-hdr">
+      <span class="modal-title">Pick a card</span>
+      <button class="modal-x" onclick="closePicker()">×</button>
+    </div>
+    <div id="cpick-grid"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     RANGE MATRIX MODAL
+══════════════════════════════════════════ -->
+<div class="overlay" id="rm-modal">
+  <div class="modal">
+    <!-- Header -->
+    <div class="modal-hdr" style="margin-bottom:8px">
+      <span class="modal-title" id="rm-title">Range Selector</span>
+      <button class="modal-x" onclick="closeRangeMatrix()">×</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="rm-stats">
+      <span class="rm-combos-badge"><span id="rm-combos">0</span> combos</span>
+      <span class="rm-pct-badge"><span id="rm-pct">0.0</span>% of hands</span>
+    </div>
+
+    <!-- Presets -->
+    <div class="rm-preset-btns">
+      <button class="rm-preset-btn" onclick="rmPreset('pairs')">Pairs</button>
+      <button class="rm-preset-btn" onclick="rmPreset('suited')">Suited</button>
+      <button class="rm-preset-btn" onclick="rmPreset('offsuit')">Offsuit</button>
+      <button class="rm-preset-btn" onclick="rmPreset('premium')">Premium</button>
+      <button class="rm-preset-btn" onclick="rmPreset('all')">All</button>
+      <button class="rm-preset-btn" onclick="rmPreset('invert')">Invert</button>
+      <button class="rm-preset-btn" style="color:var(--red);border-color:var(--red)" onclick="rmPreset('clear')">✕ Clear</button>
+    </div>
+
+    <!-- Legend -->
+    <div class="rm-legend">
+      <div class="rm-leg-item"><div class="rm-leg-sw" style="background:#b8860b"></div>Pairs</div>
+      <div class="rm-leg-item"><div class="rm-leg-sw" style="background:#218f50"></div>Suited</div>
+      <div class="rm-leg-item"><div class="rm-leg-sw" style="background:#1d6fa3"></div>Offsuit</div>
+    </div>
+
+    <!-- 13×13 Matrix -->
+    <div class="rm-grid-outer">
+      <div class="rm-grid-wrap" id="rm-grid"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="rm-footer">
+      <div style="flex:1;min-width:0">
+        <input class="rm-text-input" id="rm-text" type="text"
+          placeholder="Type your range or use the grid…"
+          oninput="rmTextChanged()">
+      </div>
+      <div class="rm-footer-btns">
+        <button class="btn btn-secondary btn-sm" onclick="closeRangeMatrix()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="applyRangeMatrix()">Apply ✓</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════ -->
+<script>
+/* ──────────────────────────────────
+   CONSTANTS
+────────────────────────────────── */
+const RANKS  = '23456789TJQKA'.split('');
+const SUITS  = 'cdhs'.split('');
+const SS     = {c:'♣',d:'♦',h:'♥',s:'♠'};
+const SC     = {c:'black',d:'red',h:'red',s:'black'};
+const PCOLS  = ['#27ae60','#3498db','#e67e22','#9b59b6','#e74c3c','#1abc9c'];
+
+// Range matrix ranks: high→low
+const MR = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+
+/* ──────────────────────────────────
+   APP STATE
+────────────────────────────────── */
+let players      = [];
+let boardCards   = [null,null,null,null,null];
+let scFlopCards  = [null,null,null];
+let selTurn      = null;
+let pIdCtr       = 0;
+
+// Card picker
+let pickerTarget = null;
+let pickerUsed   = new Set();
+
+// Range matrix
+let rmTarget     = null;   // 'p{id}' | 'sc1' | 'sc2'
+let rmSel        = new Set(); // 'r,c' keys
+let rmBaseSel    = new Set();
+let rmDrag       = false;
+let rmDragStart  = null;
+let rmDragAct    = null;   // 'sel' | 'desel'
+
+/* ──────────────────────────────────
+   INIT
+────────────────────────────────── */
+/* Generate <option> tags for BB dropdown: 10–100 in steps of 5 */
+function bbOptions(selected) {
+  let html = '<option value="">— BB</option>';
+  for (let v = 10; v <= 100; v += 5) {
+    const sel = String(selected) === String(v) ? ' selected' : '';
+    html += `<option value="${v}"${sel}>${v} BB</option>`;
+  }
+  return html;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildBoardSlots('board-slots', boardCards, 5, 'board');
+  buildBoardSlots('sc-flop-slots', scFlopCards, 3, 'sc-flop');
+  addPlayer(); addPlayer();
+  buildRMGrid();
+  setupTabs();
+  // Populate scenario BB selects
+  ['sc-bb1','sc-bb2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = bbOptions('');
+  });
+  // Matrix drag listeners
+  document.addEventListener('mouseup', () => { rmDrag = false; });
+  document.getElementById('rm-grid').addEventListener('mouseleave', () => { if(rmDrag) rmApplyDrag(); });
+  initRL();
+  nofNewFlop();
+});
+
+function setupTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  }));
+}
+
+/* ──────────────────────────────────
+   PLAYER MANAGEMENT
+────────────────────────────────── */
+function addPlayer() {
+  if (players.length >= 6) return;
+  const id   = ++pIdCtr;
+  const color = PCOLS[players.length % PCOLS.length];
+  players.push({id, range:'', bb:'', color});
+  renderPlayers();
+  document.getElementById('add-player-btn').style.display = players.length >= 6 ? 'none' : 'inline-flex';
+}
+function removePlayer(id) {
+  if (players.length <= 2) return;
+  players = players.filter(p=>p.id!==id);
+  renderPlayers();
+  document.getElementById('add-player-btn').style.display = 'inline-flex';
+}
+function renderPlayers() {
+  const c = document.getElementById('players-container');
+  c.innerHTML = '';
+  players.forEach((p,i) => {
+    const div = document.createElement('div');
+    div.className = 'player-row';
+    div.innerHTML = `
+      <div class="player-label" style="color:${p.color}">
+        Player ${i+1}
+        <small id="pl-lbl-${p.id}">— combos</small>
+      </div>
+      <div>
+        <div class="range-field">
+          <input class="range-input" id="ri-${p.id}" type="text"
+            value="${escHtml(p.range)}" placeholder="Range or click ⊞"
+            oninput="onRangeInput(${p.id},this.value)">
+          <button class="matrix-btn" title="Visual selector"
+            onclick="openRangeMatrix('p${p.id}')">⊞</button>
+        </div>
+        <div class="combo-badge" id="cb-${p.id}"></div>
+      </div>
+      <div class="bb-wrap">
+        <select class="bb-select" id="bb-${p.id}"
+          onchange="players.find(x=>x.id===${p.id}).bb=this.value">
+          ${bbOptions(p.bb)}
+        </select>
+        <div class="bb-label">Stack BB</div>
+      </div>
+      <div class="player-color-bar" style="background:${p.color}"></div>
+      ${players.length>2
+        ? `<button class="remove-btn" onclick="removePlayer(${p.id})" title="Remove">×</button>`
+        : '<div></div>'}
+    `;
+    c.appendChild(div);
+  });
+}
+function onRangeInput(id, val) {
+  const p = players.find(x=>x.id===id);
+  if(p) p.range = val;
+  validateRange(id, val, false);
+}
+function validateRange(id, val, isSc) {
+  if (!val.trim()) { setCombo(id,'','',isSc); return; }
+  const board = isSc
+    ? scFlopCards.filter(Boolean).map(c=>c.str)
+    : boardCards.filter(Boolean).map(c=>c.str);
+  fetch('/api/validate_range',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({range:val,board})
+  }).then(r=>r.json()).then(d=>{
+    if(d.valid) setCombo(id,`${d.available} combos`,'valid',isSc);
+    else setCombo(id,'Invalid range','error',isSc);
+  }).catch(()=>{});
+}
+function setCombo(id, txt, cls, isSc) {
+  const sel = isSc ? `sc-cb${id}` : `cb-${id}`;
+  const lbl = isSc ? null : `pl-lbl-${id}`;
+  const el = document.getElementById(sel);
+  if(el){el.textContent=txt;el.className='combo-badge '+cls;}
+  if(lbl){const l=document.getElementById(lbl);if(l)l.textContent=txt||'— combos';}
+}
+
+/* ──────────────────────────────────
+   BOARD SLOTS
+────────────────────────────────── */
+function buildBoardSlots(cid, arr, n, type) {
+  const c = document.getElementById(cid);
+  c.innerHTML = '';
+  const lbls = n===3?['Flop 1','Flop 2','Flop 3']:['Flop','Flop','Flop','Turn','River'];
+  for(let i=0;i<n;i++){
+    if(type==='board' && i===3){ const sep=document.createElement('div');sep.className='board-sep';c.appendChild(sep); }
+    const s=document.createElement('div');
+    s.className='board-slot';s.id=`${type}-slot-${i}`;
+    s.onclick=()=>{
+      const a=type==='sc-flop'?scFlopCards:boardCards;
+      if(a[i]){a[i]=null;renderSlot(s,null,lbls[i]);afterBoardChange(type);}
+      else openPicker({type,idx:i});
+    };
+    renderSlot(s,null,lbls[i]);
+    c.appendChild(s);
+  }
+}
+function renderSlot(el,card,lbl){
+  if(!card){el.className='board-slot';el.innerHTML=`<span class="slot-lbl">${lbl||'+'}</span>`;return;}
+  const red=SC[card.suit]==='red';
+  el.className='board-slot filled '+(red?'rc':'bc');
+  el.innerHTML=`<div class="card-r">${card.rank}</div><div class="card-s">${SS[card.suit]}</div>`;
+}
+function setSlot(type,idx,card){
+  const lbls=type==='sc-flop'?['Flop 1','Flop 2','Flop 3']:['Flop','Flop','Flop','Turn','River'];
+  renderSlot(document.getElementById(`${type}-slot-${idx}`),card,lbls[idx]);
+}
+function afterBoardChange(type){
+  if(type==='board') players.forEach(p=>validateRange(p.id,p.range,false));
+  else {scValidate(1);scValidate(2);}
+}
+
+/* ──────────────────────────────────
+   CARD PICKER
+────────────────────────────────── */
+function openPicker(target){
+  pickerTarget=target;
+  const used=new Set();
+  boardCards.forEach((c,i)=>{ if(c&&!(target.type==='board'&&i===target.idx)) used.add(c.str); });
+  scFlopCards.forEach((c,i)=>{ if(c&&!(target.type==='sc-flop'&&i===target.idx)) used.add(c.str); });
+  if(selTurn) used.add(selTurn.str);
+  pickerUsed=used;
+  buildPickerGrid();
+  document.getElementById('card-picker-modal').classList.add('open');
+}
+function closePicker(){ document.getElementById('card-picker-modal').classList.remove('open'); }
+function buildPickerGrid(){
+  const g=document.getElementById('cpick-grid');g.innerHTML='';
+  // rank header row
+  const rh=document.createElement('div');rh.className='cpick-rank-row';
+  rh.innerHTML='<div></div>'+RANKS.map(r=>`<div class="cpick-rank-lbl">${r}</div>`).join('');
+  g.appendChild(rh);
+  // suit rows (s,h,d,c order)
+  ['s','h','d','c'].forEach(suit=>{
+    const row=document.createElement('div');row.className='cpick-row';
+    const lbl=document.createElement('div');lbl.className='cpick-suit-lbl';
+    lbl.style.color=SC[suit]==='red'?'#e74c3c':'#aaa';
+    lbl.textContent=SS[suit];row.appendChild(lbl);
+    RANKS.forEach(rank=>{
+      const cstr=rank+suit;const used=pickerUsed.has(cstr);
+      const btn=document.createElement('button');
+      btn.className='pick-card '+(SC[suit]==='red'?'red':'black')+(used?' used':'');
+      btn.innerHTML=`<span>${rank}</span><span class="ps">${SS[suit]}</span>`;
+      if(!used) btn.onclick=()=>pickCard(rank,suit);
+      row.appendChild(btn);
+    });
+    g.appendChild(row);
+  });
+}
+function pickCard(rank,suit){
+  const card={str:rank+suit,rank,suit};
+  const {type,idx}=pickerTarget;
+  if(type==='board'){boardCards[idx]=card;setSlot('board',idx,card);}
+  else{scFlopCards[idx]=card;setSlot('sc-flop',idx,card);}
+  closePicker();
+  afterBoardChange(type);
+}
+
+/* ──────────────────────────────────
+   RANGE MATRIX — BUILD GRID
+────────────────────────────────── */
+function buildRMGrid(){
+  const g=document.getElementById('rm-grid');g.innerHTML='';
+  // Corner
+  addRMEl(g,'div','rm-hdr','');
+  // Column headers
+  MR.forEach(r=>addRMEl(g,'div','rm-hdr',r));
+  // Rows
+  MR.forEach((rr,ri)=>{
+    // Row header
+    addRMEl(g,'div','rm-hdr',rr);
+    // Cells
+    MR.forEach((cr,ci)=>{
+      const hand=cellHand(ri,ci);
+      const type=ri===ci?'pair':(ri<ci?'suited':'offsuit');
+      const combos=ri===ci?6:(ri<ci?4:12);
+      const cell=document.createElement('div');
+      cell.className=`mcell ${type}`;
+      cell.dataset.r=ri;cell.dataset.c=ci;
+      cell.innerHTML=`<div class="mh">${hand}</div><div class="mc">${combos}</div>`;
+      cell.addEventListener('mousedown',e=>{e.preventDefault();rmMouseDown(ri,ci);});
+      cell.addEventListener('mouseover',()=>rmMouseOver(ri,ci));
+      g.appendChild(cell);
+    });
+  });
+}
+function addRMEl(parent,tag,cls,txt){
+  const el=document.createElement(tag);
+  el.className=cls;el.textContent=txt;parent.appendChild(el);
+}
+function cellHand(r,c){
+  if(r===c) return MR[r]+MR[c];
+  if(r<c)   return MR[r]+MR[c]+'s';
+  return MR[c]+MR[r]+'o';
+}
+function cellKey(r,c){return `${r},${c}`;}
+
+/* ──────────────────────────────────
+   RANGE MATRIX — OPEN / CLOSE
+────────────────────────────────── */
+function openRangeMatrix(target){
+  rmTarget=target;
+  // Determine title and get current range text
+  let title='Range Selector', rngStr='';
+  if(target.startsWith('p')){
+    const id=parseInt(target.slice(1));
+    const p=players.find(x=>x.id===id);
+    const idx=players.indexOf(p);
+    if(p){title=`Range — Player ${idx+1}`;rngStr=p.range;}
+  } else if(target==='sc1'){
+    title='Range — Player 1 (Scenario)';
+    rngStr=document.getElementById('sc-r1').value;
+  } else {
+    title='Range — Player 2 (Scenario)';
+    rngStr=document.getElementById('sc-r2').value;
+  }
+  document.getElementById('rm-title').textContent=title;
+  // Init selection from text
+  rmSel=textToMatrix(rngStr);
+  document.getElementById('rm-text').value=rngStr;
+  rmRenderAll();
+  document.getElementById('rm-modal').classList.add('open');
+}
+function closeRangeMatrix(){
+  document.getElementById('rm-modal').classList.remove('open');
+}
+function applyRangeMatrix(){
+  const rng=matrixToText(rmSel);
+  if(rmTarget.startsWith('p')){
+    const id=parseInt(rmTarget.slice(1));
+    const p=players.find(x=>x.id===id);
+    if(p){p.range=rng;const inp=document.getElementById(`ri-${id}`);if(inp)inp.value=rng;validateRange(id,rng,false);}
+  } else if(rmTarget==='sc1'){
+    document.getElementById('sc-r1').value=rng;scValidate(1);
+  } else {
+    document.getElementById('sc-r2').value=rng;scValidate(2);
+  }
+  closeRangeMatrix();
+}
+
+/* ──────────────────────────────────
+   RANGE MATRIX — DRAG SELECT
+────────────────────────────────── */
+function rmMouseDown(r,c){
+  rmDrag=true;
+  rmDragStart={r,c};
+  rmBaseSel=new Set(rmSel);
+  const key=cellKey(r,c);
+  rmDragAct=rmBaseSel.has(key)?'desel':'sel';
+  rmApplyDrag(r,c);
+}
+function rmMouseOver(r,c){
+  if(!rmDrag) return;
+  rmApplyDrag(r,c);
+}
+function rmApplyDrag(curR,curC){
+  if(curR===undefined||curC===undefined) return;
+  const {r:sr,c:sc}=rmDragStart;
+  const minR=Math.min(sr,curR),maxR=Math.max(sr,curR);
+  const minC=Math.min(sc,curC),maxC=Math.max(sc,curC);
+  // Reset to base, then apply action to rectangle
+  rmSel=new Set(rmBaseSel);
+  for(let r=minR;r<=maxR;r++){
+    for(let c=minC;c<=maxC;c++){
+      const key=cellKey(r,c);
+      if(rmDragAct==='sel') rmSel.add(key);
+      else rmSel.delete(key);
+    }
+  }
+  rmRenderAll();
+}
+
+/* ──────────────────────────────────
+   RANGE MATRIX — RENDER
+────────────────────────────────── */
+function rmRenderAll(){
+  document.querySelectorAll('#rm-grid .mcell').forEach(cell=>{
+    const r=parseInt(cell.dataset.r),c=parseInt(cell.dataset.c);
+    const sel=rmSel.has(cellKey(r,c));
+    cell.classList.toggle('sel',sel);
+    cell.classList.toggle('preview',false);
+  });
+  updateRMStats();
+  // Sync text
+  document.getElementById('rm-text').value=matrixToText(rmSel);
+}
+function updateRMStats(){
+  let combos=0;
+  rmSel.forEach(key=>{
+    const [r,c]=key.split(',').map(Number);
+    combos+=(r===c?6:(r<c?4:12));
+  });
+  document.getElementById('rm-combos').textContent=combos;
+  document.getElementById('rm-pct').textContent=(combos/13.26).toFixed(1);
+}
+
+/* ──────────────────────────────────
+   RANGE MATRIX — PRESETS
+────────────────────────────────── */
+function rmPreset(name){
+  switch(name){
+    case 'all':    rmSel=new Set(allCellKeys());break;
+    case 'pairs':  rmSel=new Set(allCellKeys().filter(k=>{const[r,c]=k.split(',');return r===c;}));break;
+    case 'suited': rmSel=new Set(allCellKeys().filter(k=>{const[r,c]=k.split(',').map(Number);return r<c;}));break;
+    case 'offsuit':rmSel=new Set(allCellKeys().filter(k=>{const[r,c]=k.split(',').map(Number);return r>c;}));break;
+    case 'premium':rmSel=textToMatrix('AA,KK,QQ,JJ,TT,AKs,AQs,AKo');break;
+    case 'clear':  rmSel=new Set();break;
+    case 'invert':
+      const all=new Set(allCellKeys());
+      const inv=new Set();
+      all.forEach(k=>{ if(!rmSel.has(k)) inv.add(k); });
+      rmSel=inv;break;
+  }
+  rmRenderAll();
+}
+function allCellKeys(){
+  const keys=[];
+  for(let r=0;r<13;r++) for(let c=0;c<13;c++) keys.push(cellKey(r,c));
+  return keys;
+}
+
+/* ──────────────────────────────────
+   RANGE MATRIX — TEXT SYNC
+────────────────────────────────── */
+function rmTextChanged(){
+  const txt=document.getElementById('rm-text').value;
+  rmSel=textToMatrix(txt);
+  // Render cells without touching text input
+  document.querySelectorAll('#rm-grid .mcell').forEach(cell=>{
+    const r=parseInt(cell.dataset.r),c=parseInt(cell.dataset.c);
+    cell.classList.toggle('sel',rmSel.has(cellKey(r,c)));
+  });
+  updateRMStats();
+}
+
+/* matrixToText: Set<'r,c'> → 'AA,KK,AKs,...' */
+function matrixToText(sel){
+  const hands=[];
+  // Iterate in natural order: top-left to bottom-right
+  for(let r=0;r<13;r++) for(let c=0;c<13;c++){
+    if(sel.has(cellKey(r,c))) hands.push(cellHand(r,c));
+  }
+  return hands.join(',');
+}
+
+/* textToMatrix: parse range string → Set<'r,c'> */
+function textToMatrix(str){
+  const sel=new Set();
+  if(!str) return sel;
+  str.replace(/\s/g,'').split(',').forEach(part=>{
+    handToCells(part.trim()).forEach(k=>sel.add(k));
+  });
+  return sel;
+}
+function handToCells(h){
+  if(!h||h.length<2) return [];
+  // Specific card: AhKs → skip
+  if(h.length===4&&'cdhs'.includes(h[1].toLowerCase())) return [];
+  if(h.includes('-')) return dashCells(h);
+  if(h.endsWith('+'))  return plusCells(h.slice(0,-1));
+  return plainCells(h);
+}
+function plainCells(h){
+  let s=false,o=false;
+  if(h.endsWith('s')){s=true;h=h.slice(0,-1);}
+  else if(h.endsWith('o')){o=true;h=h.slice(0,-1);}
+  if(h.length!==2) return [];
+  const r1i=MR.indexOf(h[0].toUpperCase()),r2i=MR.indexOf(h[1].toUpperCase());
+  if(r1i<0||r2i<0) return [];
+  if(r1i===r2i) return (s||o)?[]:[cellKey(r1i,r2i)];
+  const [hi,lo]=r1i<r2i?[r1i,r2i]:[r2i,r1i]; // hi=lower index=higher rank
+  const cells=[];
+  if(!o) cells.push(cellKey(hi,lo));  // suited: row=hi,col=lo
+  if(!s) cells.push(cellKey(lo,hi));  // offsuit: row=lo,col=hi
+  return cells;
+}
+function plusCells(h){
+  let s=false,o=false;
+  if(h.endsWith('s')){s=true;h=h.slice(0,-1);}
+  else if(h.endsWith('o')){o=true;h=h.slice(0,-1);}
+  if(h.length!==2) return [];
+  const r1i=MR.indexOf(h[0].toUpperCase()),r2i=MR.indexOf(h[1].toUpperCase());
+  if(r1i<0||r2i<0) return [];
+  const cells=[];
+  if(r1i===r2i){
+    // Pair+: from this pair (lower index = higher rank) up to AA (index 0)
+    for(let i=0;i<=r1i;i++) cells.push(cellKey(i,i));
+    return cells;
+  }
+  const hi=Math.min(r1i,r2i); // top card (fixed), lower index
+  const lo0=Math.max(r1i,r2i); // bottom card starting point
+  // lo goes from lo0 down toward hi+1 (increasing rank)
+  for(let lo=hi+1;lo<=lo0;lo++){
+    if(!o) cells.push(cellKey(hi,lo));
+    if(!s) cells.push(cellKey(lo,hi));
+  }
+  return cells;
+}
+function dashCells(h){
+  let sl=false,ol=false,sr=false,or_=false;
+  const parts=h.split('-');
+  if(parts.length!==2) return [];
+  let left=parts[0],right=parts[1];
+  if(left.endsWith('s')){sl=true;left=left.slice(0,-1);}
+  else if(left.endsWith('o')){ol=true;left=left.slice(0,-1);}
+  if(right.endsWith('s')){sr=true;right=right.slice(0,-1);}
+  else if(right.endsWith('o')){or_=true;right=right.slice(0,-1);}
+  const s=sl||sr,o=ol||or_;
+  if(left.length!==2||right.length!==2) return [];
+  const l1=MR.indexOf(left[0].toUpperCase()),l2=MR.indexOf(left[1].toUpperCase());
+  const r1=MR.indexOf(right[0].toUpperCase()),r2=MR.indexOf(right[1].toUpperCase());
+  if(l1<0||l2<0||r1<0||r2<0) return [];
+  const lhi=Math.min(l1,l2),llo=Math.max(l1,l2);
+  const rhi=Math.min(r1,r2),rlo=Math.max(r1,r2);
+  const cells=[];
+  if(lhi===llo&&rhi===rlo){
+    // Pair range
+    const lo=Math.min(lhi,rhi),hi=Math.max(lhi,rhi);
+    for(let i=lo;i<=hi;i++) cells.push(cellKey(i,i));
+  } else if(lhi===rhi){
+    // Same top rank, bottom varies
+    const loMin=Math.min(llo,rlo),loMax=Math.max(llo,rlo);
+    for(let lo=loMin;lo<=loMax;lo++){
+      if(!o) cells.push(cellKey(lhi,lo));
+      if(!s) cells.push(cellKey(lo,lhi));
+    }
+  } else if(llo===rlo){
+    // Same bottom rank, top varies
+    const hiMin=Math.min(lhi,rhi),hiMax=Math.max(lhi,rhi);
+    for(let hi=hiMin;hi<=hiMax;hi++){
+      if(!o) cells.push(cellKey(hi,llo));
+      if(!s) cells.push(cellKey(llo,hi));
+    }
+  }
+  return cells;
+}
+
+/* ──────────────────────────────────
+   EQUITY CALCULATOR
+────────────────────────────────── */
+async function calculateEquity(){
+  const btn=document.getElementById('calc-btn');
+  const spin=document.getElementById('calc-spin');
+  const status=document.getElementById('calc-status');
+  const err=document.getElementById('calc-err');
+  err.classList.remove('on');
+  btn.disabled=true;spin.classList.add('on');status.textContent='Calculating…';
+
+  const pData=players.map(p=>({range:p.range.trim(),bb:p.bb||''}));
+  const board=boardCards.filter(Boolean).map(c=>c.str);
+  try{
+    const res=await fetch('/api/equity',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({players:pData,board,iterations:20000})
+    });
+    const data=await res.json();
+    if(data.error){showErr('calc-err',data.error);}
+    else{renderResults(data.results,pData);status.textContent=`Board: ${board.length} card(s)`;}
+  }catch(e){showErr('calc-err','Error: '+e.message);}
+  finally{btn.disabled=false;spin.classList.remove('on');}
+}
+function renderResults(results,pData){
+  const sec=document.getElementById('results-section');
+  sec.classList.add('visible');
+  const c=document.getElementById('results-container');
+  c.innerHTML=results.map((r,i)=>{
+    const col=players[i]?.color||PCOLS[i];
+    const eq=r.equity.toFixed(1);
+    const bb=pData[i]?.bb?`<span style="color:var(--muted);font-size:10px"> · ${pData[i].bb} BB</span>`:'';
+    return `
+    <div class="result-row">
+      <div class="result-range" style="color:${col}">${escHtml(r.range)}${bb}
+        <div style="font-size:10px;color:var(--muted);font-weight:400">${r.combos} combos</div>
+      </div>
+      <div class="result-bar-wrap">
+        <div class="result-bar-bg">
+          <div class="result-bar-fill" style="width:${eq}%;background:${col}33"></div>
+        </div>
+        <div class="result-bar-lbl" style="color:${col}">${eq}%</div>
+      </div>
+      <div class="result-stat"><div class="val" style="color:${col}">${eq}%</div><div class="lbl">Equity</div></div>
+      <div class="result-stat"><div class="val">${r.wins.toFixed(1)}%</div><div class="lbl">Won</div></div>
+      <div class="result-stat"><div class="val">${r.ties.toFixed(1)}%</div><div class="lbl">Tied</div></div>
+    </div>`;
+  }).join('');
+}
+function clearCalc(){
+  boardCards=[null,null,null,null,null];
+  buildBoardSlots('board-slots',boardCards,5,'board');
+  players.forEach(p=>{p.range='';const i=document.getElementById(`ri-${p.id}`);if(i)i.value='';setCombo(p.id,'','',false);});
+  document.getElementById('results-section').classList.remove('visible');
+  document.getElementById('calc-err').classList.remove('on');
+}
+
+/* ──────────────────────────────────
+   SCENARIO ANALYZER
+────────────────────────────────── */
+function scValidate(n){
+  const val=document.getElementById(`sc-r${n}`).value;
+  if(!val.trim()){document.getElementById(`sc-cb${n}`).textContent='';return;}
+  const board=scFlopCards.filter(Boolean).map(c=>c.str);
+  fetch('/api/validate_range',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({range:val,board})
+  }).then(r=>r.json()).then(d=>{
+    const el=document.getElementById(`sc-cb${n}`);
+    el.textContent=d.valid?`${d.available} combos`:'Invalid';
+    el.className='combo-badge '+(d.valid?'valid':'error');
+  });
+}
+async function analyzeTurn(){
+  const r1=document.getElementById('sc-r1').value.trim();
+  const r2=document.getElementById('sc-r2').value.trim();
+  const flop=scFlopCards.filter(Boolean).map(c=>c.str);
+  if(!r1||!r2){showErr('sc-err','Enter ranges for both players');return;}
+  if(flop.length!==3){showErr('sc-err','Enter all 3 flop cards');return;}
+  document.getElementById('sc-err').classList.remove('on');
+  const btn=document.getElementById('sc-btn'),spin=document.getElementById('sc-spin');
+  btn.disabled=true;spin.classList.add('on');
+  try{
+    const res=await fetch('/api/scenario/turn',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({range1:r1,range2:r2,flop})
+    });
+    const data=await res.json();
+    if(data.error){showErr('sc-err',data.error);return;}
+    selTurn=null;
+    document.getElementById('turn-info').classList.remove('on');
+    document.getElementById('sc-river-sec').style.display='none';
+    document.getElementById('sc-turn-sec').style.display='block';
+    renderCardGrid('sc-turn-grid',data.results,'turn',flop);
+  }catch(e){showErr('sc-err','Error: '+e.message);}
+  finally{btn.disabled=false;spin.classList.remove('on');}
+}
+async function analyzeRiver(){
+  if(!selTurn) return;
+  const r1=document.getElementById('sc-r1').value.trim();
+  const r2=document.getElementById('sc-r2').value.trim();
+  const flop=scFlopCards.filter(Boolean).map(c=>c.str);
+  const btn=document.getElementById('river-btn'),spin=document.getElementById('rv-spin');
+  btn.disabled=true;spin.classList.add('on');
+  try{
+    const res=await fetch('/api/scenario/river',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({range1:r1,range2:r2,flop,turn:selTurn.str})
+    });
+    const data=await res.json();
+    if(data.error){showErr('sc-err',data.error);return;}
+    document.getElementById('sc-river-sec').style.display='block';
+    const dead=[...flop,selTurn.str];
+    renderCardGrid('sc-river-grid',data.results,'river',dead);
+    document.getElementById('sc-river-sec').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){showErr('sc-err','Error: '+e.message);}
+  finally{btn.disabled=false;spin.classList.remove('on');}
+}
+function clearScenario(){
+  scFlopCards=[null,null,null];
+  buildBoardSlots('sc-flop-slots',scFlopCards,3,'sc-flop');
+  ['sc-r1','sc-r2'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['sc-cb1','sc-cb2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
+  document.getElementById('sc-turn-sec').style.display='none';
+  document.getElementById('sc-river-sec').style.display='none';
+  document.getElementById('turn-info').classList.remove('on');
+  document.getElementById('sc-err').classList.remove('on');
+  selTurn=null;
+}
+
+/* ──────────────────────────────────
+   SCENARIO CARD GRID RENDER
+────────────────────────────────── */
+function renderCardGrid(gid, results, mode, deadStrs){
+  const g=document.getElementById(gid);g.innerHTML='';
+  // Rank headers (13 cells)
+  RANKS.forEach(r=>{ const h=document.createElement('div');h.className='sc-rank-hdr';h.textContent=r;g.appendChild(h); });
+  // Build lookup
+  const byCard={};results.forEach(r=>byCard[r.str]=r);
+  // 4 rows: s,h,d,c
+  ['s','h','d','c'].forEach(suit=>{
+    RANKS.forEach(rank=>{
+      const cstr=rank+suit;
+      const res=byCard[cstr];
+      const dead=deadStrs.includes(cstr)||!res;
+      const cell=document.createElement('div');
+      cell.className='acell'+(dead?' dead':'');
+      if(!dead&&res){
+        const eq=res.equity_p1;
+        cell.style.background=eqColor(eq);
+        const txtDark=eq>55;
+        const rankColor=SC[suit]==='red'?(txtDark?'#6b0000':'#ff6b6b'):(txtDark?'#111':'#eee');
+        const suitColor=SC[suit]==='red'?(txtDark?'#990000':'#ff4444'):(txtDark?'#222':'#ddd');
+        cell.innerHTML=`<div class="ar" style="color:${rankColor}">${rank}</div>`+
+          `<div class="as" style="color:${suitColor}">${SS[suit]}</div>`+
+          `<div class="ae" style="color:${txtDark?'#333':'#ccc'}">${eq.toFixed(0)}%</div>`;
+        if(mode==='turn') cell.onclick=()=>selectTurn(res,cell);
+      } else {
+        cell.innerHTML=`<div class="ar" style="color:#444">${rank}</div>`+
+          `<div class="as" style="color:#444">${SS[suit]}</div>`;
+      }
+      g.appendChild(cell);
+    });
+  });
+}
+function eqColor(eq){
+  if(eq<=50){
+    const t=eq/50;
+    return `rgb(231,${Math.round(76+(243-76)*t)},${Math.round(60+(18-60)*t)})`;
+  } else {
+    const t=(eq-50)/50;
+    return `rgb(${Math.round(243+(39-243)*t)},${Math.round(243+(174-243)*t)},${Math.round(18+(96-18)*t)})`;
+  }
+}
+function selectTurn(res,cellEl){
+  document.querySelectorAll('#sc-turn-grid .acell.sel-turn').forEach(e=>e.classList.remove('sel-turn'));
+  cellEl.classList.add('sel-turn');
+  selTurn=res;
+  // Update turn info bar
+  const bar=document.getElementById('turn-info');bar.classList.add('on');
+  const mini=document.getElementById('turn-mini');
+  const red=SC[res.suit]==='red';
+  mini.className='mini-card '+(red?'rc':'bc');
+  mini.innerHTML=`<div class="mr">${res.rank}</div><div class="ms">${SS[res.suit]}</div>`;
+  document.getElementById('sc-river-sec').style.display='none';
+}
+
+/* ──────────────────────────────────
+   HELPERS
+────────────────────────────────── */
+function showErr(id,msg){const el=document.getElementById(id);el.textContent='⚠ '+msg;el.classList.add('on');}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ══════════════════════════════════════════════════════════
+   RANGE LIBRARY
+══════════════════════════════════════════════════════════ */
+
+const RL_COLORS = [
+  {id:'open',     label:'Open/Raise', color:'#27ae60'},
+  {id:'call',     label:'Call',       color:'#2471a3'},
+  {id:'threebet', label:'3bet',       color:'#e67e22'},
+  {id:'fourbet',  label:'4bet+',      color:'#c0392b'},
+  {id:'limp',     label:'Limp/Check', color:'#7d3c98'},
+];
+const RL_CMAP = {};
+RL_COLORS.forEach(c => RL_CMAP[c.id] = c.color);
+
+const RL_CATS = {
+  'RFI': {
+    label:'Open',
+    hero:['LJ','HJ','CO','BTN'],
+    villain:null,
+    stacks:[10,11,12,13,14,15,16,17,18,19,20,25,50,100]
+  },
+  'vs_Open': {
+    label:'vs Open',
+    hero:['BTN','CO','HJ','SB','BB'],
+    villain:{
+      'HJ':['LJ'],
+      'CO':['LJ','HJ'],
+      'BTN':['LJ','HJ','CO'],
+      'SB':['LJ','HJ','CO','BTN'],
+      'BB':['LJ','HJ','CO','BTN','SB']
+    }
+  },
+  'vs_3bet': {
+    label:'vs 3bet',
+    hero:['LJ','HJ','CO','BTN','SB'],
+    villain:{
+      'LJ':['HJ','CO','BTN','SB','BB'],
+      'HJ':['CO','BTN','SB','BB'],
+      'CO':['BTN','SB','BB'],
+      'BTN':['SB','BB'],
+      'SB':['BB']
+    }
+  },
+  'BvB': {
+    label:'Blind vs Blind',
+    hero:['SB','BB'],
+    villain:{'SB':['BB'],'BB':['SB']}
+  }
+};
+
+const RL_STACKS = [10,11,12,13,14,15,16,17,18,19,20,25,30,40,50,75,100];
+
+// Per-category color label overrides: {catId: {colorId: label}}
+const RL_CAT_LABELS = {
+  'RFI':    { call:'Tight', threebet:'Open', open:'Loose', fourbet:'All in' },
+  'vs_Open':{ threebet:'3bet', limp:'3bet light', open:'Call', fourbet:'All in' },
+  'vs_3bet':{ open:'Call' },
+};
+
+function rlColorLabel(colorId){
+  return (RL_CAT_LABELS[rlCat]&&RL_CAT_LABELS[rlCat][colorId])
+    || RL_COLORS.find(c=>c.id===colorId)?.label
+    || colorId;
+}
+
+// ── State ──
+let rlCat   = 'RFI';
+let rlHero  = 'BTN';
+let rlVill  = null;
+let rlStack = 100;
+let rlCells = {};        // 'r,c' → {c1:'open', c2:null|colorId}
+let rlColor = 'open';
+let rlHalf  = false;
+// drag
+let rlDrag = false, rlDragBase = {}, rlDragStart = null;
+
+// ── Storage helpers ──
+function rlKey(){
+  return rlVill
+    ? `${rlCat}|${rlHero}|${rlVill}|${rlStack}`
+    : `${rlCat}|${rlHero}|${rlStack}`;
+}
+function rlStore(){
+  try { return JSON.parse(localStorage.getItem('pkr_ranges')||'{}'); }
+  catch { return {}; }
+}
+function rlStoreSet(lib){ localStorage.setItem('pkr_ranges', JSON.stringify(lib)); }
+
+// ── Load / Save ──
+function rlLoadCells(){
+  const lib = rlStore();
+  const entry = lib[rlKey()];
+  rlCells = entry ? JSON.parse(JSON.stringify(entry.cells||{})) : {};
+  rlRenderGrid();
+  rlUpdateLegend();
+}
+function rlSave(btn){
+  const lib = rlStore();
+  lib[rlKey()] = {
+    cells: rlCells,
+    savedAt: Date.now(),
+    meta: {cat:rlCat, hero:rlHero, vill:rlVill, stack:rlStack}
+  };
+  rlStoreSet(lib);
+  rlUpdateSavedList();
+  if(btn){ const t=btn.textContent; btn.textContent='✓ Saved!';
+    setTimeout(()=>btn.textContent=t,1600); }
+}
+function rlClear(){ rlCells={}; rlRenderGrid(); rlUpdateLegend(); }
+
+// ── Category / position / stack setters ──
+function rlSetCat(cat){
+  rlCat = cat;
+  document.querySelectorAll('#rl-cats .rl-cat-btn').forEach(b=>{
+    const matches = b.getAttribute('onclick').includes(`'${cat}'`);
+    b.classList.toggle('active', matches);
+  });
+  const s = RL_CATS[cat];
+  rlHero = s.hero[0];
+  rlVill = s.villain ? s.villain[rlHero][0] : null;
+  rlBuildPosSec();
+  rlBuildPalette();
+  rlBuildStack();
+  rlLoadCells();
+}
+function rlSetHero(pos){
+  rlHero = pos;
+  const vmap = RL_CATS[rlCat].villain;
+  rlVill = vmap ? vmap[pos][0] : null;
+  rlBuildPosSec();
+  rlLoadCells();
+}
+function rlSetVill(pos){ rlVill=pos; rlBuildPosSec(); rlLoadCells(); }
+function rlSetStack(v){ rlStack=parseInt(v); rlUpdateLabel(); rlLoadCells(); }
+
+// ── Position section HTML ──
+function rlBuildPosSec(){
+  const s = RL_CATS[rlCat];
+  let h = '<div style="display:flex;gap:20px;flex-wrap:wrap">';
+  // Hero
+  h += `<div>
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">
+      ${s.villain ? 'My position' : 'Position'}
+    </div>
+    <div class="rl-pos-row">`;
+  s.hero.forEach(p => {
+    h += `<button class="rl-pos-btn${p===rlHero?' active':''}" onclick="rlSetHero('${p}')">${p}</button>`;
+  });
+  h += '</div></div>';
+  // Villain
+  if(s.villain && s.villain[rlHero]){
+    h += `<div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Opponent</div>
+      <div class="rl-pos-row">`;
+    s.villain[rlHero].forEach(p => {
+      h += `<button class="rl-pos-btn${p===rlVill?' active':''}" onclick="rlSetVill('${p}')">${p}</button>`;
+    });
+    h += '</div></div>';
+  }
+  h += '</div>';
+  document.getElementById('rl-pos-section').innerHTML = h;
+  rlUpdateLabel();
+}
+function rlUpdateLabel(){
+  const lbl = {
+    'RFI'    : `${rlHero} Open`,
+    'vs_Open': `${rlHero} vs Open ${rlVill||''}`,
+    'vs_3bet': `${rlHero} vs 3bet ${rlVill||''}`,
+    'BvB'    : `BvB ${rlHero} vs ${rlVill||''}`
+  }[rlCat] || rlCat;
+  document.getElementById('rl-range-label').textContent = `${lbl} — ${rlStack} BB`;
+}
+
+// ── Color palette ──
+function rlBuildPalette(){
+  const p = document.getElementById('rl-palette');
+  p.innerHTML = '';
+  RL_COLORS.forEach((col,i) => {
+    const btn = document.createElement('button');
+    btn.className = 'rl-cbtn' + (i===0?' active':'');
+    btn.style.cssText = `background:${col.color};border-color:transparent`;
+    btn.dataset.cid = col.id;
+    btn.title = rlColorLabel(col.id);
+    btn.onclick = () => rlSetColor(col.id);
+    const lbl = rlColorLabel(col.id);
+    btn.innerHTML = `<span class="rl-label">${lbl.split('/')[0]}</span>`;
+    p.appendChild(btn);
+  });
+  // Eraser
+  const er = document.createElement('button');
+  er.className = 'rl-eraser'; er.id='rl-eraser'; er.textContent='⌫'; er.title='Eraser';
+  er.onclick = () => rlSetColor('erase');
+  p.appendChild(er);
+}
+function rlSetColor(cid){
+  rlColor = cid;
+  document.querySelectorAll('#rl-palette .rl-cbtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.cid === cid));
+  const er = document.getElementById('rl-eraser');
+  if(er) er.classList.toggle('active', cid==='erase');
+}
+function rlSetHalf(val){
+  rlHalf = val;
+  document.getElementById('rl-full-btn').classList.toggle('active',!val);
+  document.getElementById('rl-half-btn').classList.toggle('active', val);
+}
+
+// ── Grid build (once) ──
+function rlBuildGrid(){
+  const g = document.getElementById('rl-grid'); g.innerHTML='';
+  // corner + col headers
+  addRMEl(g,'div','rl-hdr','');
+  MR.forEach(r => addRMEl(g,'div','rl-hdr',r));
+  // rows
+  MR.forEach((rr,ri) => {
+    addRMEl(g,'div','rl-hdr',rr);
+    MR.forEach((_,ci) => {
+      const hand = cellHand(ri,ci);
+      const cell = document.createElement('div');
+      cell.className='rlcell empty';
+      cell.dataset.r=ri; cell.dataset.c=ci;
+      cell.innerHTML=`<div class="rh">${hand}</div>`;
+      cell.addEventListener('mousedown', e=>{e.preventDefault();rlMDown(ri,ci);});
+      cell.addEventListener('mouseover', ()=>rlMOver(ri,ci));
+      g.appendChild(cell);
+    });
+  });
+}
+
+// ── Drag paint ──
+function rlMDown(r,c){
+  rlDrag=true; rlDragStart={r,c};
+  rlDragBase=JSON.parse(JSON.stringify(rlCells));
+  rlApplyPaint(r,c,r,c);
+}
+function rlMOver(r,c){
+  if(!rlDrag) return;
+  const {r:sr,c:sc}=rlDragStart;
+  rlCells=JSON.parse(JSON.stringify(rlDragBase));
+  const minR=Math.min(sr,r),maxR=Math.max(sr,r);
+  const minC=Math.min(sc,c),maxC=Math.max(sc,c);
+  for(let rr=minR;rr<=maxR;rr++) for(let cc=minC;cc<=maxC;cc++) rlPaintCell(rr,cc);
+  rlRenderGrid(); rlUpdateLegend();
+}
+function rlApplyPaint(r1,c1,r2,c2){
+  rlPaintCell(r1,c1);
+  rlRenderGrid(); rlUpdateLegend();
+}
+
+// ── Cell paint logic ──
+// Cell data: {c1, c2} where c1 = top-left diagonal half, c2 = bottom-right diagonal half.
+// Either can be null. Cell is removed from rlCells entirely when both are null.
+function rlPaintCell(r,c){
+  const key=`${r},${c}`;
+  if(rlColor==='erase'){
+    if(rlHalf){
+      // half-eraser: remove the secondary half (c2). c1 (the "main" half) is left untouched.
+      // If only c1 exists (full-painted cell), turn it into a half cell (move c1 to c2 so the
+      // remaining painted area is the bottom-right diagonal, matching half-paint convention).
+      const ex = rlCells[key];
+      if(ex){
+        if(ex.c2)      rlCells[key]={c1:ex.c1, c2:null};
+        else if(ex.c1) rlCells[key]={c1:null, c2:ex.c1};
+      }
+    } else {
+      delete rlCells[key];
+    }
+  } else if(rlHalf){
+    // Half mode: paint ONLY the secondary half. Leave c1 untouched (may be null = empty).
+    const ex = rlCells[key]||{c1:null,c2:null};
+    rlCells[key]={c1: ex.c1, c2: rlColor};
+  } else {
+    // Full mode: paint c1 only, clear c2.
+    rlCells[key]={c1:rlColor, c2:null};
+  }
+  // Cleanup: drop the entry if both halves are empty.
+  const v = rlCells[key];
+  if(v && !v.c1 && !v.c2) delete rlCells[key];
+}
+
+// ── Render all cells ──
+function rlRenderGrid(){
+  const EMPTY_BG = '#182535';   // matches .rlcell.empty background
+  document.querySelectorAll('#rl-grid .rlcell').forEach(cell=>{
+    const r=parseInt(cell.dataset.r), c=parseInt(cell.dataset.c);
+    const d = rlCells[`${r},${c}`];
+    if(!d || (!d.c1 && !d.c2)){
+      cell.className='rlcell empty';
+      cell.style.background='';
+      cell.querySelectorAll('.rh,.rc').forEach(el=>el.style.color='');
+      return;
+    }
+    cell.className='rlcell';
+    const col1 = d.c1 ? (RL_CMAP[d.c1]||'#555') : null;
+    const col2 = d.c2 ? (RL_CMAP[d.c2]||'#555') : null;
+    if(col1 && col2 && d.c1!==d.c2){
+      // Split: top-left = c1, bottom-right = c2
+      cell.style.background=`linear-gradient(135deg, ${col1} 50%, ${col2} 50%)`;
+    } else if(col1 && !col2){
+      cell.style.background=col1;
+    } else if(!col1 && col2){
+      // Half cell: only bottom-right painted, top-left empty
+      cell.style.background=`linear-gradient(135deg, ${EMPTY_BG} 50%, ${col2} 50%)`;
+    } else {
+      // both halves same color
+      cell.style.background=col1;
+    }
+    cell.querySelectorAll('.rh,.rc').forEach(el=>el.style.color='#fff');
+  });
+}
+
+// ── Legend & combo stats ──
+function rlUpdateLegend(){
+  const totals={};
+  RL_COLORS.forEach(col=>totals[col.id]=0);
+  Object.entries(rlCells).forEach(([key,d])=>{
+    const [r,c]=key.split(',').map(Number);
+    const n = r===c?6:(r<c?4:12);
+    if(d.c1 && d.c2 && d.c1!==d.c2){
+      // Two different halves
+      totals[d.c1]=(totals[d.c1]||0)+n*0.5;
+      totals[d.c2]=(totals[d.c2]||0)+n*0.5;
+    } else if(d.c1){
+      // Full c1 (c2 same or null)
+      totals[d.c1]=(totals[d.c1]||0)+n;
+    } else if(d.c2){
+      // Half cell: only c2 painted, primary half empty
+      totals[d.c2]=(totals[d.c2]||0)+n*0.5;
+    }
+  });
+  const grandTotal=Object.values(totals).reduce((a,b)=>a+b,0);
+  const leg=document.getElementById('rl-legend');
+  leg.innerHTML = RL_COLORS.map(col=>{
+    const n=totals[col.id]||0;
+    if(n===0) return '';
+    return `<div class="rl-leg-it">
+      <div class="rl-leg-sw" style="background:${col.color}"></div>
+      ${rlColorLabel(col.id)}: <strong>${n%1?n.toFixed(1):n}</strong> combos (${(n/13.26).toFixed(1)}% of hands)
+    </div>`;
+  }).join('')
+  + (grandTotal>0
+    ? `<div style="margin-left:auto;font-size:11px;color:var(--green-lt);font-weight:700">
+        Total: ${grandTotal%1?grandTotal.toFixed(1):grandTotal} combos — ${(grandTotal/13.26).toFixed(1)}% of hands
+       </div>` : '');
+}
+
+// ── Saved list ──
+function rlUpdateSavedList(){
+  const lib=rlStore();
+  const entries=Object.entries(lib).sort((a,b)=>(b[1].savedAt||0)-(a[1].savedAt||0));
+  const cont=document.getElementById('rl-saved-list');
+  if(!entries.length){
+    cont.innerHTML='<span style="font-size:12px;color:var(--muted)">No saved ranges</span>';
+    return;
+  }
+  cont.innerHTML=entries.map(([key,data])=>{
+    const m=data.meta||{};
+    const lbl={
+      'RFI'    :`Open ${m.hero}`,
+      'vs_Open':`${m.hero} vs Open ${m.vill}`,
+      'vs_3bet':`${m.hero} vs 3bet ${m.vill}`,
+      'BvB'    :`BvB ${m.hero}/${m.vill}`
+    }[m.cat]||key;
+    const n=Object.keys(data.cells||{}).length;
+    return `<div class="rl-stag" onclick="rlLoadKey('${escHtml(key)}')">
+      ${escHtml(lbl)} — ${m.stack}BB
+      <span style="color:var(--muted);font-size:10px">(${n} cells)</span>
+      <span class="del" onclick="event.stopPropagation();rlDelKey('${escHtml(key)}')">×</span>
+    </div>`;
+  }).join('');
+}
+function rlLoadKey(key){
+  const lib=rlStore(); const entry=lib[key]; if(!entry) return;
+  const m=entry.meta||{};
+  if(m.cat){
+    rlCat=m.cat;
+    document.querySelectorAll('#rl-cats .rl-cat-btn').forEach(b=>
+      b.classList.toggle('active', b.getAttribute('onclick').includes(`'${m.cat}'`)));
+  }
+  if(m.hero) rlHero=m.hero;
+  rlVill = m.vill||null;
+  if(m.stack) { rlStack=m.stack; document.getElementById('rl-stack').value=m.stack; }
+  rlCells=JSON.parse(JSON.stringify(entry.cells||{}));
+  rlBuildPosSec();
+  rlRenderGrid();
+  rlUpdateLegend();
+}
+function rlDelKey(key){
+  const lib=rlStore(); delete lib[key]; rlStoreSet(lib); rlUpdateSavedList();
+}
+
+// ── Copy panel ──
+function rlShowCopyPanel(){
+  const p=document.getElementById('rl-copy-panel');
+  const isOpen=p.style.display!=='none';
+  p.style.display=isOpen?'none':'block';
+  document.getElementById('rl-copy-btn').textContent=isOpen?'Copy to…':'▲ Copy to…';
+  if(!isOpen) cpInit();
+}
+function rlHideCopyPanel(){
+  document.getElementById('rl-copy-panel').style.display='none';
+  document.getElementById('rl-copy-btn').textContent='Copy to…';
+}
+function cpInit(){
+  const catSel=document.getElementById('cp-cat');
+  catSel.value=rlCat;
+  cpUpdateHero();
+}
+function cpUpdateHero(){
+  const cat=document.getElementById('cp-cat').value;
+  const heroSel=document.getElementById('cp-hero');
+  heroSel.innerHTML=RL_CATS[cat].hero.map(p=>
+    `<option value="${p}"${p===rlHero?' selected':''}>${p}</option>`
+  ).join('');
+  cpUpdateVill();
+}
+function cpUpdateVill(){
+  const cat=document.getElementById('cp-cat').value;
+  const hero=document.getElementById('cp-hero').value;
+  const s=RL_CATS[cat];
+  const wrap=document.getElementById('cp-vill-wrap');
+  const villSel=document.getElementById('cp-vill');
+  const stackSel=document.getElementById('cp-stack');
+  const cpStacks = RL_CATS[cat].stacks || RL_STACKS;
+  stackSel.innerHTML=cpStacks.map(bb=>
+    `<option value="${bb}"${bb===rlStack?' selected':''}>${bb} BB</option>`
+  ).join('');
+  if(s.villain&&s.villain[hero]){
+    wrap.style.display='block';
+    villSel.innerHTML=s.villain[hero].map(p=>
+      `<option value="${p}"${p===rlVill?' selected':''}>${p}</option>`
+    ).join('');
+  } else {
+    wrap.style.display='none';
+  }
+}
+function rlDoCopy(){
+  const cat=document.getElementById('cp-cat').value;
+  const hero=document.getElementById('cp-hero').value;
+  const villVisible=document.getElementById('cp-vill-wrap').style.display!=='none';
+  const vill=villVisible?document.getElementById('cp-vill').value:null;
+  const stack=parseInt(document.getElementById('cp-stack').value);
+  const targetKey=vill?`${cat}|${hero}|${vill}|${stack}`:`${cat}|${hero}|${stack}`;
+  const lib=rlStore();
+  lib[targetKey]={cells:JSON.parse(JSON.stringify(rlCells)),savedAt:Date.now(),meta:{cat,hero,vill,stack}};
+  rlStoreSet(lib);
+  rlUpdateSavedList();
+  const btn=document.querySelector('#rl-copy-panel .btn-primary');
+  const orig=btn.textContent; btn.textContent='✓ Copied!';
+  setTimeout(()=>{ btn.textContent=orig; rlHideCopyPanel(); },1000);
+}
+
+// ── Export to calculator ──
+function rlUseInCalc(){
+  const hands=[];
+  for(let r=0;r<13;r++) for(let c=0;c<13;c++){
+    if(rlCells[`${r},${c}`]) hands.push(cellHand(r,c));
+  }
+  if(!hands.length){ alert('The range is empty — paint some cells first.'); return; }
+  const rng=hands.join(',');
+  if(players.length>0){
+    const p=players[0]; p.range=rng;
+    const inp=document.getElementById(`ri-${p.id}`);
+    if(inp) inp.value=rng;
+    validateRange(p.id,rng,false);
+  }
+  // Switch tab
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.querySelector('[data-tab="calculator"]').classList.add('active');
+  document.getElementById('tab-calculator').classList.add('active');
+}
+
+// ── Stack select ──
+function rlCatStacks(){ return RL_CATS[rlCat].stacks || RL_STACKS; }
+function rlBuildStack(){
+  const stacks = rlCatStacks();
+  if(!stacks.includes(rlStack)){
+    rlStack = stacks.reduce((a,b) => Math.abs(b-rlStack)<Math.abs(a-rlStack)?b:a);
+  }
+  const sel=document.getElementById('rl-stack');
+  sel.innerHTML=stacks.map(bb=>`<option value="${bb}"${bb===rlStack?' selected':''}>${bb} BB</option>`).join('');
+}
+
+// ── Stack scroll (mouse wheel) ──
+function rlScrollStack(deltaY){
+  const stacks = rlCatStacks();
+  const idx = stacks.indexOf(rlStack);
+  if(idx === -1) return;
+  const next = idx + (deltaY > 0 ? -1 : 1);
+  if(next < 0 || next >= stacks.length) return;
+  rlStack = stacks[next];
+  document.getElementById('rl-stack').value = rlStack;
+  rlUpdateLabel();
+  rlLoadCells();
+}
+
+/* ══════════════════════════════════════════════════════════
+   TRAINING
+══════════════════════════════════════════════════════════ */
+
+// ── Training type selector ──
+function selectTraining(id){
+  document.querySelectorAll('.tr-type-btn').forEach(b=>{
+    b.classList.toggle('active', b.getAttribute('onclick').includes(`'${id}'`));
+  });
+  document.querySelectorAll('.tr-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`tr-${id}`).classList.add('active');
+}
+
+// ── Nature of Flop ──
+let nofFlop    = [];
+let nofAnswered= false;
+let nofScoreOk = 0;
+let nofScoreKo = 0;
+
+// Flop classification:
+//   'dry'   = Très Dry
+//   'mid'   = Intermédiaire
+//   'drawy' = Drawy
+//
+// Rules (clarified with user):
+//   ─ PAIRED FLOPS (paire prime tout) ──
+//     pair of 8+      → Dry   (even with a draw)
+//     pair of 4-7     → Drawy
+//     pair of 2 or 3  → Intermediate
+//
+//   ─ NO-PAIR FLOPS ──
+//     7-high or lower → Drawy (rule 1)
+//     monotone (3 same suit) → Intermediate
+//     OESD definition: span = max_rank - min_rank ≤ 3
+//     Flush draw: any 2 cards same suit (and not monotone)
+//
+//     A or K high:
+//       no draw  + 0–1 low cards (2-7)  → Dry
+//       no draw  + 2 low cards          → Intermediate
+//       w/ draw  + 0 low cards          → Dry  (stays dry)
+//       w/ draw  + 1+ low cards         → Intermediate
+//
+//     Q/J/T/9/8 high:
+//       no draw  + 0 low cards          → Dry
+//       no draw  + 1–2 low cards        → Intermediate
+//       w/ draw  → Intermediate
+function nofCorrectAnswer(flop){
+  const RV = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'T':10,'J':11,'Q':12,'K':13,'A':14};
+  const ranks = flop.map(c => RV[c.rank]);
+  const suits = flop.map(c => c.suit);
+
+  // ── Pair detection ──
+  const counts = {};
+  ranks.forEach(r => counts[r] = (counts[r]||0)+1);
+  for (const k in counts){
+    if (counts[k] >= 2){
+      const pr = parseInt(k);
+      if (pr >= 8) return 'dry';
+      if (pr >= 4) return 'drawy';
+      return 'mid';
+    }
+  }
+
+  // ── No pair: sort desc ──
+  const sorted = [...ranks].sort((a,b)=>b-a);
+  const high = sorted[0];
+  const low  = sorted[2];
+
+  // 7-high or lower
+  if (high <= 7) return 'drawy';
+
+  // Monotone (3 same suit) → Intermediate
+  if (suits[0]===suits[1] && suits[1]===suits[2]) return 'mid';
+
+  // Draws
+  const flushDraw = (suits[0]===suits[1]) || (suits[1]===suits[2]) || (suits[0]===suits[2]);
+  const oesd      = (high - low) <= 3;     // OESD: span ≤ 3 over the 3 distinct ranks
+  const hasDraw   = flushDraw || oesd;
+
+  // Low cards count (2-7)
+  const lowCount = ranks.filter(r => r <= 7).length;
+
+  // A / K high
+  if (high >= 13){
+    if (!hasDraw) return lowCount <= 1 ? 'dry' : 'mid';
+    return lowCount === 0 ? 'dry' : 'mid';
+  }
+
+  // Q / J / T / 9 / 8 high
+  if (!hasDraw) return lowCount === 0 ? 'dry' : 'mid';
+  return 'mid';
+}
+
+function nofNewFlop(){
+  // Build deck and shuffle
+  const deck=[];
+  for(const r of RANKS) for(const s of SUITS) deck.push({rank:r,suit:s,str:r+s});
+  for(let i=deck.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [deck[i],deck[j]]=[deck[j],deck[i]];
+  }
+  nofFlop=deck.slice(0,3);
+  nofAnswered=false;
+  nofRenderFlop();
+  // Reset buttons
+  document.querySelectorAll('.nof-btn').forEach(b=>{
+    b.className='nof-btn';
+    b.disabled=false;
+  });
+  const res=document.getElementById('nof-result');
+  res.textContent='';res.className='nof-result';
+}
+
+function nofRenderFlop(){
+  const c=document.getElementById('nof-flop');
+  c.innerHTML=nofFlop.map(card=>{
+    const red=SC[card.suit]==='red';
+    return `<div class="nof-card ${red?'rc':'bc'}">
+      <div class="nof-card-rank">${card.rank}</div>
+      <div class="nof-card-suit">${SS[card.suit]}</div>
+    </div>`;
+  }).join('');
+}
+
+function nofAnswer(choice){
+  if(nofAnswered) return;
+  nofAnswered=true;
+
+  const correct=nofCorrectAnswer(nofFlop);
+  const res=document.getElementById('nof-result');
+  const btns=document.querySelectorAll('.nof-btn');
+
+  // Disable all buttons
+  btns.forEach(b=>b.disabled=true);
+
+  if(correct===null){
+    // Rules not yet defined — just highlight selection
+    document.querySelector(`.nof-btn[data-answer="${choice}"]`).classList.add('selected');
+    res.textContent='Answer recorded — rules coming soon.';
+    res.className='nof-result';
+    nofAnswered=false; // allow re-selection until rules exist
+    btns.forEach(b=>b.disabled=false);
+    return;
+  }
+
+  // Show correct/wrong feedback
+  btns.forEach(b=>{
+    if(b.dataset.answer===correct) b.classList.add('correct');
+    else if(b.dataset.answer===choice && choice!==correct) b.classList.add('wrong');
+  });
+
+  if(choice===correct){
+    nofScoreOk++;
+    res.textContent='✓ Correct!';
+    res.className='nof-result correct';
+  } else {
+    nofScoreKo++;
+    res.textContent='✗ Wrong — correct answer: '+{dry:'Très Dry',mid:'Intermédiaire',drawy:'Drawy'}[correct];
+    res.className='nof-result wrong';
+  }
+  document.getElementById('nof-correct').textContent=nofScoreOk;
+  document.getElementById('nof-wrong').textContent=nofScoreKo;
+  document.getElementById('nof-total').textContent=nofScoreOk+nofScoreKo;
+}
+
+// ── Init ──
+function initRL(){
+  rlBuildGrid();
+  rlBuildPalette();
+  rlBuildStack();
+  rlBuildPosSec();
+  rlLoadCells();
+  rlUpdateSavedList();
+  document.addEventListener('mouseup',()=>{ rlDrag=false; });
+  document.getElementById('tab-library').addEventListener('wheel', e=>{
+    if(document.getElementById('rl-saved-list').contains(e.target)) return;
+    e.preventDefault();
+    rlScrollStack(e.deltaY);
+  }, {passive:false});
+}
+</script>
+</body>
+</html>
