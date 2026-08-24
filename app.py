@@ -1,8 +1,55 @@
 from flask import Flask, render_template, request, jsonify
 from math import comb
+import os
+import json
+import hashlib
 import poker_engine as pe
 
-app = Flask(__name__)
+# psycopg2 is only needed for cloud sync (Neon). Keep it optional so the app
+# still runs locally without a database configured.
+try:
+    import psycopg2
+except ImportError:  # pragma: no cover
+    psycopg2 = None
+
+# Absolute template folder so Flask finds templates regardless of the working
+# directory (important on Vercel's serverless runtime).
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'templates'))
+
+# Neon / Postgres connection string (set in Vercel env vars). Use the *pooled*
+# connection string from Neon for serverless.
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+
+# ---------------------------------------------------------------------------
+# Cloud sync helpers (Neon Postgres)
+# ---------------------------------------------------------------------------
+
+def _db_conn():
+    """Open a short-lived Postgres connection. Raises RuntimeError if sync
+    is not configured (no DATABASE_URL) or the driver is missing."""
+    if not DATABASE_URL:
+        raise RuntimeError('Cloud sync is not configured on the server.')
+    if psycopg2 is None:
+        raise RuntimeError('Database driver (psycopg2) is not installed.')
+    return psycopg2.connect(DATABASE_URL)
+
+
+def _ensure_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ranges (
+            user_key   TEXT PRIMARY KEY,
+            data       JSONB NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+
+
+def _user_key(passphrase):
+    """Derive a storage key from the passphrase. The raw passphrase is never
+    stored — only this hash is used as the row key."""
+    return hashlib.sha256(('pkr-sync:' + passphrase).encode('utf-8')).hexdigest()
 
 
 def _parse_board(board_strs):
@@ -179,6 +226,71 @@ def analyze_river():
         return jsonify({'error': str(e), 'detail': traceback.format_exc()}), 500
 
     return jsonify({'results': results})
+
+
+@app.route('/api/sync/pull', methods=['POST'])
+def sync_pull():
+    """Return the whole saved-ranges blob for a passphrase."""
+    data = request.json or {}
+    pw = (data.get('passphrase') or '').strip()
+    if len(pw) < 4:
+        return jsonify({'error': 'Passphrase too short (min 4 characters).'}), 400
+    try:
+        conn = _db_conn()
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 503
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                _ensure_table(cur)
+                cur.execute(
+                    "SELECT data, updated_at FROM ranges WHERE user_key = %s",
+                    (_user_key(pw),))
+                row = cur.fetchone()
+        if not row:
+            return jsonify({'found': False, 'data': {}, 'updated_at': None})
+        blob = row[0]
+        if isinstance(blob, str):
+            blob = json.loads(blob)
+        return jsonify({'found': True, 'data': blob,
+                        'updated_at': row[1].isoformat()})
+    except Exception as e:
+        return jsonify({'error': f'Sync failed: {e}'}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/sync/push', methods=['POST'])
+def sync_push():
+    """Upsert the whole saved-ranges blob for a passphrase."""
+    data = request.json or {}
+    pw = (data.get('passphrase') or '').strip()
+    ranges = data.get('data')
+    if len(pw) < 4:
+        return jsonify({'error': 'Passphrase too short (min 4 characters).'}), 400
+    if not isinstance(ranges, dict):
+        return jsonify({'error': 'Invalid ranges payload.'}), 400
+    try:
+        conn = _db_conn()
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 503
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                _ensure_table(cur)
+                cur.execute("""
+                    INSERT INTO ranges (user_key, data, updated_at)
+                    VALUES (%s, %s, now())
+                    ON CONFLICT (user_key)
+                    DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+                    RETURNING updated_at
+                """, (_user_key(pw), json.dumps(ranges)))
+                ts = cur.fetchone()[0]
+        return jsonify({'ok': True, 'updated_at': ts.isoformat()})
+    except Exception as e:
+        return jsonify({'error': f'Sync failed: {e}'}), 500
+    finally:
+        conn.close()
 
 
 if __name__ == '__main__':

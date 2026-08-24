@@ -483,6 +483,11 @@ main{max-width:1120px;margin:0 auto;padding:20px 14px}
       <div class="rl-toolbar-label" style="margin-bottom:5px">Effective stack</div>
       <select class="rl-sel-stack" id="rl-stack" onchange="rlSetStack(this.value)"></select>
     </div>
+    <div style="margin-top:10px">
+      <div class="rl-toolbar-label" style="margin-bottom:5px">Raise size (BB)</div>
+      <input class="rl-sel-stack" id="rl-raise" type="text" placeholder="e.g. 3.5 or limp"
+        oninput="rlSetRaise(this.value)" style="font-family:monospace">
+    </div>
     <span class="rl-range-label" id="rl-range-label">BTN Open — 100BB</span>
 
     <div class="rl-right-sep"></div>
@@ -504,7 +509,7 @@ main{max-width:1120px;margin:0 auto;padding:20px 14px}
         <option value="vs_3bet">vs 3bet</option>
         <option value="BvB">BvB</option>
       </select>
-      <div class="rl-toolbar-label" style="margin-bottom:3px">Position</div>
+      <div class="rl-toolbar-label" style="margin-bottom:3px" id="cp-hero-label">Position</div>
       <select id="cp-hero" class="rl-sel-stack" style="margin-bottom:7px" onchange="cpUpdateVill()"></select>
       <div id="cp-vill-wrap">
         <div class="rl-toolbar-label" style="margin-bottom:3px">Opponent</div>
@@ -521,6 +526,20 @@ main{max-width:1120px;margin:0 auto;padding:20px 14px}
     <div class="rl-saved-list" id="rl-saved-list">
       <span style="font-size:12px;color:var(--muted)">No saved ranges</span>
     </div>
+
+    <!-- Cloud sync -->
+    <div class="rl-right-sep"></div>
+    <div class="section-title" style="margin-bottom:8px">☁ Cloud Sync</div>
+    <div style="font-size:10px;color:var(--muted);line-height:1.5;margin-bottom:7px">
+      Use the same passphrase on every device to share your saved ranges.
+    </div>
+    <input class="rl-sel-stack" id="rl-sync-pass" type="password" autocomplete="off"
+      placeholder="Sync passphrase" style="margin-bottom:6px" oninput="rlSyncSavePass(this.value)">
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <button class="btn btn-secondary btn-sm" onclick="rlSyncPull()" style="flex:1;justify-content:center" title="Load ranges from the cloud (replaces local)">☁↓ Pull</button>
+      <button class="btn btn-secondary btn-sm" onclick="rlSyncPush()" style="flex:1;justify-content:center" title="Send your local ranges to the cloud">☁↑ Push</button>
+    </div>
+    <div id="rl-sync-status" style="font-size:10px;color:var(--muted);min-height:14px"></div>
   </div>
 
 </div><!-- /tab-library -->
@@ -1406,7 +1425,7 @@ const RL_CATS = {
       'CO':['LJ','HJ'],
       'BTN':['LJ','HJ','CO'],
       'SB':['LJ','HJ','CO','BTN'],
-      'BB':['LJ','HJ','CO','BTN','SB']
+      'BB':['LJ','HJ','CO','BTN']
     }
   },
   'vs_3bet': {
@@ -1427,6 +1446,28 @@ const RL_CATS = {
   }
 };
 
+// ── BvB decision-tree scenarios (replaces hero/villain for Blind vs Blind) ──
+const BVB_SCENARIOS = [
+  {id:'sb_open',         label:'SB vs BB',           hero:'SB'},
+  {id:'bb_vs_limp',      label:'BB vs SB limp',      hero:'BB'},
+  {id:'bb_vs_raise',     label:'BB vs SB raise',     hero:'BB'},
+  {id:'sb_vs_3bet',      label:'SB open vs BB 3bet', hero:'SB'},
+  {id:'sb_limp_vs_3bet', label:'SB limp vs BB 3bet', hero:'SB'},
+  {id:'bb_limp_3bet',    label:'BB vs SB limp/3bet', hero:'BB'},
+];
+const BVB_SCEN_MAP = {};
+BVB_SCENARIOS.forEach(s => BVB_SCEN_MAP[s.id] = s);
+
+// Per-scenario color label hints for BvB (colorId → label)
+const BVB_SCEN_LABELS = {
+  'sb_open':         {open:'Raise',   limp:'Limp'},
+  'bb_vs_limp':      {limp:'Check',   threebet:'Raise',  open:'Raise'},
+  'bb_vs_raise':     {call:'Call',    threebet:'3bet',   fourbet:'All-in'},
+  'sb_vs_3bet':      {call:'Call',    fourbet:'4bet',    threebet:'4bet'},
+  'sb_limp_vs_3bet': {call:'Call',    fourbet:'Raise'},
+  'bb_limp_3bet':    {limp:'Check',   threebet:'Raise',  open:'Limp'},
+};
+
 const RL_STACKS = [10,11,12,13,14,15,16,17,18,19,20,25,30,40,50,75,100];
 
 // Per-category color label overrides: {catId: {colorId: label}}
@@ -1437,16 +1478,22 @@ const RL_CAT_LABELS = {
 };
 
 function rlColorLabel(colorId){
+  if(rlCat==='BvB'){
+    const m = BVB_SCEN_LABELS[rlScenario];
+    if(m && m[colorId]) return m[colorId];
+  }
   return (RL_CAT_LABELS[rlCat]&&RL_CAT_LABELS[rlCat][colorId])
     || RL_COLORS.find(c=>c.id===colorId)?.label
     || colorId;
 }
 
 // ── State ──
-let rlCat   = 'RFI';
-let rlHero  = 'BTN';
-let rlVill  = null;
-let rlStack = 100;
+let rlCat      = 'RFI';
+let rlHero     = 'BTN';
+let rlVill     = null;
+let rlScenario = 'sb_open';   // BvB only
+let rlStack    = 100;
+let rlRaise    = '';          // raise-size annotation (BB) for the current range
 let rlCells = {};        // 'r,c' → {c1:'open', c2:null|colorId}
 let rlColor = 'open';
 let rlHalf  = false;
@@ -1455,6 +1502,7 @@ let rlDrag = false, rlDragBase = {}, rlDragStart = null;
 
 // ── Storage helpers ──
 function rlKey(){
+  if(rlCat==='BvB') return `BvB|${rlScenario}|${rlStack}`;
   return rlVill
     ? `${rlCat}|${rlHero}|${rlVill}|${rlStack}`
     : `${rlCat}|${rlHero}|${rlStack}`;
@@ -1470,18 +1518,25 @@ function rlLoadCells(){
   const lib = rlStore();
   const entry = lib[rlKey()];
   rlCells = entry ? JSON.parse(JSON.stringify(entry.cells||{})) : {};
+  rlRaise = entry && entry.raise != null ? entry.raise : '';
+  const ri = document.getElementById('rl-raise');
+  if(ri) ri.value = rlRaise;
   rlRenderGrid();
   rlUpdateLegend();
+  rlUpdateLabel();
 }
 function rlSave(btn){
   const lib = rlStore();
   lib[rlKey()] = {
     cells: rlCells,
     savedAt: Date.now(),
-    meta: {cat:rlCat, hero:rlHero, vill:rlVill, stack:rlStack}
+    raise: rlRaise,
+    meta: {cat:rlCat, hero:rlHero, vill:rlVill, stack:rlStack,
+           scenario: rlCat==='BvB'?rlScenario:null, raise:rlRaise}
   };
   rlStoreSet(lib);
   rlUpdateSavedList();
+  rlSyncAutoPush();
   if(btn){ const t=btn.textContent; btn.textContent='✓ Saved!';
     setTimeout(()=>btn.textContent=t,1600); }
 }
@@ -1494,9 +1549,15 @@ function rlSetCat(cat){
     const matches = b.getAttribute('onclick').includes(`'${cat}'`);
     b.classList.toggle('active', matches);
   });
-  const s = RL_CATS[cat];
-  rlHero = s.hero[0];
-  rlVill = s.villain ? s.villain[rlHero][0] : null;
+  if(cat==='BvB'){
+    rlScenario = BVB_SCENARIOS[0].id;
+    rlHero = BVB_SCEN_MAP[rlScenario].hero;
+    rlVill = null;
+  } else {
+    const s = RL_CATS[cat];
+    rlHero = s.hero[0];
+    rlVill = s.villain ? s.villain[rlHero][0] : null;
+  }
   rlBuildPosSec();
   rlBuildPalette();
   rlBuildStack();
@@ -1510,10 +1571,32 @@ function rlSetHero(pos){
   rlLoadCells();
 }
 function rlSetVill(pos){ rlVill=pos; rlBuildPosSec(); rlLoadCells(); }
+function rlSetScenario(id){
+  rlScenario = id;
+  rlHero = BVB_SCEN_MAP[id] ? BVB_SCEN_MAP[id].hero : 'SB';
+  rlBuildPosSec();
+  rlBuildPalette();   // refresh action labels for this scenario
+  rlLoadCells();
+}
 function rlSetStack(v){ rlStack=parseInt(v); rlUpdateLabel(); rlLoadCells(); }
+function rlSetRaise(v){ rlRaise = v.trim(); rlUpdateLabel(); }
 
 // ── Position section HTML ──
 function rlBuildPosSec(){
+  // BvB uses a flat list of decision-tree scenarios instead of hero/villain.
+  if(rlCat==='BvB'){
+    let h = `<div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Scenario</div>
+      <div style="display:flex;flex-direction:column;gap:5px">`;
+    BVB_SCENARIOS.forEach(sc => {
+      h += `<button class="rl-pos-btn${sc.id===rlScenario?' active':''}" style="text-align:left"
+        onclick="rlSetScenario('${sc.id}')">${sc.label}</button>`;
+    });
+    h += '</div></div>';
+    document.getElementById('rl-pos-section').innerHTML = h;
+    rlUpdateLabel();
+    return;
+  }
   const s = RL_CATS[rlCat];
   let h = '<div style="display:flex;gap:20px;flex-wrap:wrap">';
   // Hero
@@ -1541,13 +1624,18 @@ function rlBuildPosSec(){
   rlUpdateLabel();
 }
 function rlUpdateLabel(){
-  const lbl = {
-    'RFI'    : `${rlHero} Open`,
-    'vs_Open': `${rlHero} vs Open ${rlVill||''}`,
-    'vs_3bet': `${rlHero} vs 3bet ${rlVill||''}`,
-    'BvB'    : `BvB ${rlHero} vs ${rlVill||''}`
-  }[rlCat] || rlCat;
-  document.getElementById('rl-range-label').textContent = `${lbl} — ${rlStack} BB`;
+  let lbl;
+  if(rlCat==='BvB'){
+    lbl = (BVB_SCEN_MAP[rlScenario] && BVB_SCEN_MAP[rlScenario].label) || 'BvB';
+  } else {
+    lbl = {
+      'RFI'    : `${rlHero} Open`,
+      'vs_Open': `${rlHero} vs Open ${rlVill||''}`,
+      'vs_3bet': `${rlHero} vs 3bet ${rlVill||''}`,
+    }[rlCat] || rlCat;
+  }
+  const raiseStr = rlRaise ? ` · ↑${rlRaise}${/^[\d.]+$/.test(rlRaise)?'BB':''}` : '';
+  document.getElementById('rl-range-label').textContent = `${lbl} — ${rlStack} BB${raiseStr}`;
 }
 
 // ── Color palette ──
@@ -1734,15 +1822,21 @@ function rlUpdateSavedList(){
   }
   cont.innerHTML=entries.map(([key,data])=>{
     const m=data.meta||{};
-    const lbl={
-      'RFI'    :`Open ${m.hero}`,
-      'vs_Open':`${m.hero} vs Open ${m.vill}`,
-      'vs_3bet':`${m.hero} vs 3bet ${m.vill}`,
-      'BvB'    :`BvB ${m.hero}/${m.vill}`
-    }[m.cat]||key;
+    let lbl;
+    if(m.cat==='BvB'){
+      lbl = (BVB_SCEN_MAP[m.scenario] && BVB_SCEN_MAP[m.scenario].label) || 'BvB';
+    } else {
+      lbl={
+        'RFI'    :`Open ${m.hero}`,
+        'vs_Open':`${m.hero} vs Open ${m.vill}`,
+        'vs_3bet':`${m.hero} vs 3bet ${m.vill}`,
+      }[m.cat]||key;
+    }
+    const raise = data.raise || m.raise || '';
+    const raiseStr = raise ? ` ↑${raise}${/^[\d.]+$/.test(raise)?'BB':''}` : '';
     const n=Object.keys(data.cells||{}).length;
     return `<div class="rl-stag" onclick="rlLoadKey('${escHtml(key)}')">
-      ${escHtml(lbl)} — ${m.stack}BB
+      ${escHtml(lbl)} — ${m.stack}BB${escHtml(raiseStr)}
       <span style="color:var(--muted);font-size:10px">(${n} cells)</span>
       <span class="del" onclick="event.stopPropagation();rlDelKey('${escHtml(key)}')">×</span>
     </div>`;
@@ -1756,16 +1850,28 @@ function rlLoadKey(key){
     document.querySelectorAll('#rl-cats .rl-cat-btn').forEach(b=>
       b.classList.toggle('active', b.getAttribute('onclick').includes(`'${m.cat}'`)));
   }
-  if(m.hero) rlHero=m.hero;
-  rlVill = m.vill||null;
-  if(m.stack) { rlStack=m.stack; document.getElementById('rl-stack').value=m.stack; }
+  if(m.cat==='BvB'){
+    rlScenario = m.scenario || BVB_SCENARIOS[0].id;
+    rlHero = BVB_SCEN_MAP[rlScenario] ? BVB_SCEN_MAP[rlScenario].hero : 'SB';
+    rlVill = null;
+  } else {
+    if(m.hero) rlHero=m.hero;
+    rlVill = m.vill||null;
+  }
+  if(m.stack) rlStack=m.stack;
+  rlRaise = entry.raise || m.raise || '';
   rlCells=JSON.parse(JSON.stringify(entry.cells||{}));
+  rlBuildStack();        // rebuild stack options (category-specific) + snap value
+  document.getElementById('rl-stack').value=rlStack;
+  rlBuildPalette();      // refresh labels for the (possibly new) scenario/category
   rlBuildPosSec();
+  const ri=document.getElementById('rl-raise'); if(ri) ri.value=rlRaise;
   rlRenderGrid();
   rlUpdateLegend();
+  rlUpdateLabel();
 }
 function rlDelKey(key){
-  const lib=rlStore(); delete lib[key]; rlStoreSet(lib); rlUpdateSavedList();
+  const lib=rlStore(); delete lib[key]; rlStoreSet(lib); rlUpdateSavedList(); rlSyncAutoPush();
 }
 
 // ── Copy panel ──
@@ -1788,9 +1894,18 @@ function cpInit(){
 function cpUpdateHero(){
   const cat=document.getElementById('cp-cat').value;
   const heroSel=document.getElementById('cp-hero');
-  heroSel.innerHTML=RL_CATS[cat].hero.map(p=>
-    `<option value="${p}"${p===rlHero?' selected':''}>${p}</option>`
-  ).join('');
+  const heroLbl=document.getElementById('cp-hero-label');
+  if(cat==='BvB'){
+    if(heroLbl) heroLbl.textContent='Scenario';
+    heroSel.innerHTML=BVB_SCENARIOS.map(sc=>
+      `<option value="${sc.id}"${sc.id===rlScenario?' selected':''}>${sc.label}</option>`
+    ).join('');
+  } else {
+    if(heroLbl) heroLbl.textContent='Position';
+    heroSel.innerHTML=RL_CATS[cat].hero.map(p=>
+      `<option value="${p}"${p===rlHero?' selected':''}>${p}</option>`
+    ).join('');
+  }
   cpUpdateVill();
 }
 function cpUpdateVill(){
@@ -1804,7 +1919,7 @@ function cpUpdateVill(){
   stackSel.innerHTML=cpStacks.map(bb=>
     `<option value="${bb}"${bb===rlStack?' selected':''}>${bb} BB</option>`
   ).join('');
-  if(s.villain&&s.villain[hero]){
+  if(cat!=='BvB' && s.villain && s.villain[hero]){
     wrap.style.display='block';
     villSel.innerHTML=s.villain[hero].map(p=>
       `<option value="${p}"${p===rlVill?' selected':''}>${p}</option>`
@@ -1815,15 +1930,24 @@ function cpUpdateVill(){
 }
 function rlDoCopy(){
   const cat=document.getElementById('cp-cat').value;
-  const hero=document.getElementById('cp-hero').value;
+  const hero=document.getElementById('cp-hero').value;   // BvB: this is the scenario id
   const villVisible=document.getElementById('cp-vill-wrap').style.display!=='none';
   const vill=villVisible?document.getElementById('cp-vill').value:null;
   const stack=parseInt(document.getElementById('cp-stack').value);
-  const targetKey=vill?`${cat}|${hero}|${vill}|${stack}`:`${cat}|${hero}|${stack}`;
+  let targetKey, meta;
+  if(cat==='BvB'){
+    targetKey=`BvB|${hero}|${stack}`;
+    const sc=BVB_SCEN_MAP[hero];
+    meta={cat,hero:sc?sc.hero:null,vill:null,stack,scenario:hero,raise:rlRaise};
+  } else {
+    targetKey=vill?`${cat}|${hero}|${vill}|${stack}`:`${cat}|${hero}|${stack}`;
+    meta={cat,hero,vill,stack,scenario:null,raise:rlRaise};
+  }
   const lib=rlStore();
-  lib[targetKey]={cells:JSON.parse(JSON.stringify(rlCells)),savedAt:Date.now(),meta:{cat,hero,vill,stack}};
+  lib[targetKey]={cells:JSON.parse(JSON.stringify(rlCells)),savedAt:Date.now(),raise:rlRaise,meta};
   rlStoreSet(lib);
   rlUpdateSavedList();
+  rlSyncAutoPush();
   const btn=document.querySelector('#rl-copy-panel .btn-primary');
   const orig=btn.textContent; btn.textContent='✓ Copied!';
   setTimeout(()=>{ btn.textContent=orig; rlHideCopyPanel(); },1000);
@@ -2039,6 +2163,52 @@ function nofAnswer(choice){
   document.getElementById('nof-total').textContent=nofScoreOk+nofScoreKo;
 }
 
+// ── Cloud sync (Neon) ──
+function rlSyncSavePass(v){ localStorage.setItem('pkr_sync_pass', v); }
+function rlSyncGetPass(){ return (localStorage.getItem('pkr_sync_pass')||'').trim(); }
+function rlSyncSetStatus(msg, isErr){
+  const el=document.getElementById('rl-sync-status');
+  if(el){ el.textContent=msg; el.style.color=isErr?'var(--red)':'var(--muted)'; }
+}
+async function rlSyncPush(){
+  const pw=rlSyncGetPass();
+  if(pw.length<4){ rlSyncSetStatus('Enter a passphrase (min 4 chars).', true); return; }
+  rlSyncSetStatus('Pushing…');
+  try{
+    const r=await fetch('/api/sync/push',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({passphrase:pw, data:rlStore()})});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+    rlSyncSetStatus('✓ Pushed at '+new Date().toLocaleTimeString());
+  }catch(e){ rlSyncSetStatus('✗ '+e.message, true); }
+}
+async function rlSyncPull(){
+  const pw=rlSyncGetPass();
+  if(pw.length<4){ rlSyncSetStatus('Enter a passphrase (min 4 chars).', true); return; }
+  if(!confirm('Pull replaces your local saved ranges with the cloud copy. Continue?')) return;
+  rlSyncSetStatus('Pulling…');
+  try{
+    const r=await fetch('/api/sync/pull',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({passphrase:pw})});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
+    if(!d.found){ rlSyncSetStatus('No cloud data for this passphrase yet.', true); return; }
+    rlStoreSet(d.data||{});
+    rlUpdateSavedList();
+    rlLoadCells();
+    rlSyncSetStatus('✓ Pulled at '+new Date().toLocaleTimeString());
+  }catch(e){ rlSyncSetStatus('✗ '+e.message, true); }
+}
+// Auto-push (debounced) whenever ranges change, if a passphrase is set.
+let _rlSyncTimer=null;
+function rlSyncAutoPush(){
+  if(rlSyncGetPass().length<4) return;
+  clearTimeout(_rlSyncTimer);
+  _rlSyncTimer=setTimeout(rlSyncPush, 900);
+}
+
 // ── Init ──
 function initRL(){
   rlBuildGrid();
@@ -2047,6 +2217,8 @@ function initRL(){
   rlBuildPosSec();
   rlLoadCells();
   rlUpdateSavedList();
+  const sp=document.getElementById('rl-sync-pass');
+  if(sp) sp.value=rlSyncGetPass();
   document.addEventListener('mouseup',()=>{ rlDrag=false; });
   document.getElementById('tab-library').addEventListener('wheel', e=>{
     if(document.getElementById('rl-saved-list').contains(e.target)) return;
