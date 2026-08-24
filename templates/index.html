@@ -570,8 +570,12 @@ main{max-width:1120px;margin:0 auto;padding:20px 14px}
     <div style="font-size:10px;color:var(--muted);line-height:1.5;margin-bottom:7px">
       Use the same passphrase on every device to share your saved ranges.
     </div>
-    <input class="rl-sel-stack" id="rl-sync-pass" type="password" autocomplete="off"
-      placeholder="Sync passphrase" style="margin-bottom:6px" oninput="rlSyncSavePass(this.value)">
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input class="rl-sel-stack" id="rl-sync-pass" type="password" autocomplete="off"
+        placeholder="Sync passphrase" style="flex:1;margin-bottom:0" oninput="rlSyncSavePass(this.value)">
+      <button class="btn btn-secondary btn-sm" type="button" onclick="rlSyncTogglePass(this)"
+        title="Show / hide passphrase" style="flex-shrink:0;padding:6px 11px">👁</button>
+    </div>
     <div style="display:flex;gap:6px;margin-bottom:6px">
       <button class="btn btn-secondary btn-sm" onclick="rlSyncPull()" style="flex:1;justify-content:center" title="Load ranges from the cloud (replaces local)">☁↓ Pull</button>
       <button class="btn btn-secondary btn-sm" onclick="rlSyncPush()" style="flex:1;justify-content:center" title="Send your local ranges to the cloud">☁↑ Push</button>
@@ -2227,6 +2231,11 @@ function nofAnswer(choice){
 
 // ── Cloud sync (Neon) ──
 function rlSyncSavePass(v){ localStorage.setItem('pkr_sync_pass', v); }
+function rlSyncTogglePass(btn){
+  const inp=document.getElementById('rl-sync-pass');
+  if(inp.type==='password'){ inp.type='text'; btn.textContent='🙈'; }
+  else { inp.type='password'; btn.textContent='👁'; }
+}
 function rlSyncGetPass(){ return (localStorage.getItem('pkr_sync_pass')||'').trim(); }
 function rlSyncSetStatus(msg, isErr){
   const el=document.getElementById('rl-sync-status');
