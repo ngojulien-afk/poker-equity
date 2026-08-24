@@ -540,6 +540,25 @@ main{max-width:1120px;margin:0 auto;padding:20px 14px}
       <button class="btn btn-secondary btn-sm" onclick="rlSyncPush()" style="flex:1;justify-content:center" title="Send your local ranges to the cloud">☁↑ Push</button>
     </div>
     <div id="rl-sync-status" style="font-size:10px;color:var(--muted);min-height:14px"></div>
+
+    <!-- Backup / Restore (transfer ranges between devices/addresses) -->
+    <div class="rl-right-sep"></div>
+    <div class="section-title" style="margin-bottom:8px">⇄ Backup / Restore</div>
+    <div style="font-size:10px;color:var(--muted);line-height:1.5;margin-bottom:7px">
+      Copy your ranges as a code, paste it into another version of the app.
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <button class="btn btn-secondary btn-sm" onclick="rlExport()" style="flex:1;justify-content:center">Copy backup</button>
+      <button class="btn btn-secondary btn-sm" onclick="rlImportPrompt()" style="flex:1;justify-content:center">Restore…</button>
+    </div>
+    <div id="rl-backup-box" style="display:none">
+      <textarea id="rl-backup-text" style="width:100%;height:64px;font-size:10px;font-family:monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px;resize:vertical"></textarea>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="btn btn-primary btn-sm" onclick="rlImportApply()" style="flex:1;justify-content:center">Apply</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('rl-backup-box').style.display='none'" style="flex:1;justify-content:center">Cancel</button>
+      </div>
+    </div>
+    <div id="rl-backup-status" style="font-size:10px;color:var(--muted);min-height:14px;margin-top:4px"></div>
   </div>
 
 </div><!-- /tab-library -->
@@ -2207,6 +2226,47 @@ function rlSyncAutoPush(){
   if(rlSyncGetPass().length<4) return;
   clearTimeout(_rlSyncTimer);
   _rlSyncTimer=setTimeout(rlSyncPush, 900);
+}
+
+// ── Backup / Restore (copy-paste transfer between app addresses) ──
+function rlBackupStatus(msg, isErr){
+  const el=document.getElementById('rl-backup-status');
+  if(el){ el.textContent=msg; el.style.color=isErr?'var(--red)':'var(--muted)'; }
+}
+function rlExport(){
+  const data=JSON.stringify(rlStore());
+  const box=document.getElementById('rl-backup-box');
+  const ta=document.getElementById('rl-backup-text');
+  box.style.display='block'; ta.value=data; ta.focus(); ta.select();
+  const n=Object.keys(rlStore()).length;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(data).then(
+      ()=>rlBackupStatus('✓ '+n+' range(s) copied to clipboard'),
+      ()=>rlBackupStatus('Select the text above and copy it (Cmd+C)', true));
+  } else {
+    rlBackupStatus('Select the text above and copy it (Cmd+C)', true);
+  }
+}
+function rlImportPrompt(){
+  const box=document.getElementById('rl-backup-box');
+  const ta=document.getElementById('rl-backup-text');
+  box.style.display='block'; ta.value=''; ta.focus();
+  rlBackupStatus('Paste your backup code above, then click Apply.');
+}
+function rlImportApply(){
+  const ta=document.getElementById('rl-backup-text');
+  let obj;
+  try{ obj=JSON.parse(ta.value.trim()); }
+  catch(e){ rlBackupStatus('✗ Invalid backup code (could not read it).', true); return; }
+  if(typeof obj!=='object' || obj===null || Array.isArray(obj)){
+    rlBackupStatus('✗ Invalid backup format.', true); return; }
+  const merged=Object.assign({}, rlStore(), obj);   // imported entries win
+  rlStoreSet(merged);
+  rlUpdateSavedList();
+  rlLoadCells();
+  rlSyncAutoPush();
+  rlBackupStatus('✓ Restored '+Object.keys(obj).length+' range(s).');
+  document.getElementById('rl-backup-box').style.display='none';
 }
 
 // ── Init ──
